@@ -1,0 +1,1 @@
+{"version":3,"file":"metaid.js","sources":["../src/main.ts"],"sourcesContent":["export default {\r\n  aa: 456,\r\n};\r\n"],"names":[],"mappings":";;;;;;AAAA,eAAe;IACb,IAAA,EAAE,EAAE,GAAG;KACR;;;;;;;;"}
