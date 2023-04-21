@@ -6,6 +6,7 @@
   "type": "module",
   "typings": "src/main.ts",
   "scripts": {
+    "dev": "node_modules/.bin/rollup -w -c ./rollup.config.dev.js",
     "test": "cross-env TS_NODE_PROJECT='test/tsconfig.test.json' mocha test/**/**.ts",
     "release": "standard-version",
     "build": "rollup -c -m rollup.config.js",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@babel/core": "^7.21.4",
     "@babel/preset-env": "^7.21.4",
+    "@rollup/plugin-alias": "^5.0.0",
     "@rollup/plugin-commonjs": "^24.1.0",
     "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
@@ -34,8 +36,10 @@
     "mocha": "^10.2.0",
     "rollup": "^3.20.6",
     "rollup-plugin-babel": "^4.4.0",
+    "rollup-plugin-livereload": "^2.0.5",
     "rollup-plugin-node-builtins": "^2.1.2",
     "rollup-plugin-node-globals": "^1.4.0",
+    "rollup-plugin-serve": "^2.0.2",
     "standard-version": "^9.5.0",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.2.0",
