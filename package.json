@@ -1,6 +1,6 @@
 {
   "name": "metaid-js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "dist/metaid.js",
   "license": "MIT",
   "type": "module",
