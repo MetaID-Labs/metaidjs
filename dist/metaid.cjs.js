@@ -34643,7 +34643,15 @@
       }
   }
 
-  new Request(`https://testmvc.showmoney.app/metaid-base`, {
+  const TestConfig = {
+      Aggregation: `https://api.show3.io/aggregation`,
+      Dashbroad: `https://api-test.microvisionchain.com/tool/api`,
+      BASEAPI: `https://testmvc.showmoney.app`,
+      WalletPath: 236,
+  };
+  const Env = TestConfig ;
+
+  new Request(`${Env.BASEAPI}/metaid-base`, {
       header: () => {
           const userInfo = JSON.parse(window.localStorage.getItem("userInfo"));
           if (userInfo.isAuthorized) {
@@ -34879,7 +34887,7 @@
       },
   });
 
-  new Request(`https://api.show3.io/aggregation`, {
+  new Request(`${Env.Aggregation}`, {
       //   header: {
       //     SiteConfigMetanetId: import.meta.env.VITE_SiteConfigMetanetId,
       //   },
@@ -34903,31 +34911,5 @@
       },
   }).request;
 
-  async function test() {
-      console.log("123");
-      // const metaidwallet = window.metaidwallet;
-      // console.log("connect", metaidwallet);
-      // try {
-      //   const balance = await metaidwallet.getBalance().catch((e) => {
-      //     console.log("connect", e);
-      //   });
-      //   console.log("connect", balance);
-      // } catch (error) {
-      //   console.log("connect", error);
-      // }
-  }
-  test();
-  // init();
-  // const tx = new Transation();
-  // tx.build_tx_data({
-  //   payTos: [
-  //     {
-  //       amount: 1000,
-  //       address: "12313",
-  //     },
-  //   ],
-  //   opData: "",
-  // });
-
 }));
-//# sourceMappingURL=metaid.js.map
+//# sourceMappingURL=metaid.cjs.js.map

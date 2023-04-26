@@ -1,17 +1,19 @@
 {
-  "name": "metaid-js",
+  "name": "@metaso/metaidjs",
   "version": "0.0.7",
-  "main": "dist/metaid.js",
+  "main": "dist/metaid.cjs.js",
+  "module": "dist/metaid.esm.js",
+  "browser": "dist/metaid.umd.js",
   "license": "MIT",
   "type": "module",
   "typings": "src/main.ts",
   "scripts": {
-    "dev": "node_modules/.bin/rollup -w -c ./rollup.config.dev.js",
+    "dev": "node_modules/.bin/rollup -w -c ./rollup.config.dev.js --environment ENV:testnet",
     "test": "cross-env TS_NODE_PROJECT='test/tsconfig.test.json' mocha test/**/**.ts",
     "release": "standard-version",
     "build": "rollup -c -m rollup.config.js",
     "build:watch": "rollup -c rollup.config.js --watch",
-    "build:prod": "NODE_ENV=production rollup -c rollup.config.js"
+    "build:prod": "NODE_ENV=production rollup -c rollup.config.js --environment ENV:mainnet"
   },
   "mocha": {
     "require": [
@@ -21,7 +23,16 @@
     "ui": "bdd"
   },
   "dependencies": {
-    "cross-env": "^7.0.3"
+    "@types/uuid": "8.3.4",
+    "bip39": "^3.1.0",
+    "cross-env": "^7.0.3",
+    "crypto-es": "^1.2.7",
+    "dexie": "^3.2.3",
+    "meta-contract": "^0.3.25",
+    "mvc-lib": "^1.0.5",
+    "pkg": "^5.8.1",
+    "request-sdk": "file:.yalc/request-sdk",
+    "ripemd128-js": "^1.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.21.4",
@@ -30,12 +41,16 @@
     "@rollup/plugin-commonjs": "^24.1.0",
     "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
+    "@rollup/plugin-replace": "^5.0.2",
     "@rollup/plugin-typescript": "^11.1.0",
     "@types/mocha": "^10.0.1",
+    "@types/node": "^18.15.13",
     "expect.js": "^0.3.1",
     "mocha": "^10.2.0",
+    "node-stdlib-browser": "^1.2.0",
     "rollup": "^3.20.6",
     "rollup-plugin-babel": "^4.4.0",
+    "rollup-plugin-external-globals": "^0.7.3",
     "rollup-plugin-livereload": "^2.0.5",
     "rollup-plugin-node-builtins": "^2.1.2",
     "rollup-plugin-node-globals": "^1.4.0",

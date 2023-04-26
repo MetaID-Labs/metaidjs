@@ -7,6 +7,20 @@
         <title>Document</title>
     </head>
     <body>
-        <script src="metaid.js" type="module"></script>
+        <script src="/mvc.min.js"></script>
+        <script src="/mvc-message.min.js"></script>
+        <script src="/mvc-ecies.min.js"></script>
+        <script src="/mvc-mnemonic.min.js"></script>
+        <script>
+            mvc.Message = mvcMessage;
+            mvc.ECIES = mvcEcies;
+            mvc.Mnemonic = mvcMnemonic;
+            window.mvc = mvc;
+            window.ECIES = mvc.ECIES;
+            window.Mnemonic = mvc.Mnemonic;
+        </script>
+
+        <script src="/bip39.min.js"></script>
+        <script src="metaid.umd.js" type="module"></script>
     </body>
 </html>
