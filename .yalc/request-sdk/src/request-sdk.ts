@@ -1,15 +1,7 @@
-/*
- * @Author: lgs lgs18924946920@showpay.top
- * @Date: 2023-03-13 13:41:07
- * @LastEditors: lgs lgs18924946920@showpay.top
- * @LastEditTime: 2023-04-21 17:51:02
- * @FilePath: \request-sdk\src\request-sdk.ts
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
-import type { AxiosResponse, AxiosInstance } from "axios";
-const axios = require("axios");
+import type { AxiosResponse, AxiosRequestConfig } from "axios";
+import axios from "axios";
 export default class HttpRequest {
-  request: AxiosInstance;
+  request;
   constructor(
     baseUrl: string,
     params?: {
@@ -28,10 +20,11 @@ export default class HttpRequest {
         : "请求超时，请稍后再试",
     });
     this.request.interceptors.request.use(
-      async (config) => {
+      async (config: AxiosRequestConfig<any>) => {
         if (params?.header) {
           let header;
-          if (typeof params.header === "function") header = params.header();
+          if (typeof params.header === "function")
+            header = await params.header(config);
           else header = params.header;
 
           for (const i in header) {

@@ -59,6 +59,11 @@ export enum Network {
   testnet = "testnet",
 }
 
+export enum WalletPath {
+  mainnet = 10001,
+  testnet = 236,
+}
+
 export enum JobStepStatus {
   Waiting = "waiting",
   Success = "success",
@@ -97,4 +102,9 @@ export enum MetaNameReqCode {
 export enum Chains {
   MVC = "mvc",
   ETH = "eth",
+}
+
+export enum MetaidTag {
+  test = "testmetaid",
+  main = "metaid",
 }

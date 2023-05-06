@@ -9,7 +9,7 @@ import stdLibBrowser from "node-stdlib-browser";
 import json from "@rollup/plugin-json";
 import externalGlobals from "rollup-plugin-external-globals";
 import replace from "@rollup/plugin-replace";
-
+import nodeResolve from "@rollup/plugin-node-resolve";
 const customResolver = resolve({
     extensions: [".mjs", ".js", ".jsx", ".json", ".sass", ".scss"],
 });
@@ -18,7 +18,7 @@ export default {
     output: [
         {
             file: "./dist/metaid.cjs.js",
-            format: "umd",
+            format: "commonjs",
             name: "metaidjs",
             sourcemap: true,
         },
@@ -52,7 +52,9 @@ export default {
             main: true,
             brower: true,
         }),
-        commonjs(),
+        commonjs({
+            namedExports: { tslib: ["__awaiter", "__generator"] },
+        }),
         json(),
         replace({
             __env__: JSON.stringify(process.env.ENV),
@@ -67,6 +69,7 @@ export default {
             rootDir: "./src",
             exclude: ["node_modules/**", "public/**"],
         }),
+        nodeResolve(),
 
         globals(),
         //node环境下不需要

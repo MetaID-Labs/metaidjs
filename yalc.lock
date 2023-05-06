@@ -1,8 +1,12 @@
 {
   "version": "v1",
   "packages": {
+    "metaid-provider": {
+      "signature": "480ed5ffcc1c2da16959d571002c2cbf",
+      "file": true
+    },
     "request-sdk": {
-      "signature": "24256f1772bf841682f9d7f0f4d49a90",
+      "signature": "1d6877b781d0b8c2c540f453dbf5ae8f",
       "file": true
     }
   }

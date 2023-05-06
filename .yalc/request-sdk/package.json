@@ -1,6 +1,6 @@
 {
   "name": "request-sdk",
-  "version": "0.0.12",
+  "version": "0.0.15",
   "description": "show axios request sdk",
   "main": "dist/request-sdk.min.js",
   "typings": "src/request-sdk.ts",
@@ -18,5 +18,5 @@
   "dependencies": {
     "axios": "^0.27.2"
   },
-  "yalcSig": "24256f1772bf841682f9d7f0f4d49a90"
+  "yalcSig": "1d6877b781d0b8c2c540f453dbf5ae8f"
 }

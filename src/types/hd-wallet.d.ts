@@ -69,15 +69,15 @@ declare interface BaseUserInfoTypes {
   accessKey?: string;
   userType: string;
   name: string;
-  phone: string;
-  email: string;
+  phone?: string;
+  email?: string;
   password?: string;
   pk2: string;
   token?: string;
   enCryptedMnemonic?: string;
   tag?: "new" | "old";
   referrerId?: string;
-  appToken: string;
+  appToken?: string;
   ethAddress?: string;
   evmAddress?: string;
   path: number;

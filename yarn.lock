@@ -3294,6 +3294,13 @@ meta-contract@^0.3.25:
     mvc-scrypt "^0.1.2"
     node-fetch "2"
 
+"metaid-provider@file:.yalc/metaid-provider":
+  version "0.0.10"
+  dependencies:
+    axios "^0.27.2"
+    mvc-lib "^1.0.5"
+    request-sdk "file:C:/Users/admin/AppData/Local/Yarn/Cache/v6/npm-metaid-provider-0.0.10-cef374ae-42e6-43c4-8c46-371c08424233-1683354347205/node_modules/metaid-provider/.yalc/request-sdk"
+
 micromatch@^4.0.2, micromatch@^4.0.4:
   version "4.0.5"
   resolved "https://registry.yarnpkg.com/micromatch/-/micromatch-4.0.5.tgz#bc8999a7cbbf77cdc89f132f6e467051b49090c6"
@@ -4144,8 +4151,13 @@ regjsparser@^0.9.1:
   dependencies:
     jsesc "~0.5.0"
 
+"request-sdk@file:.yalc/metaid-provider/.yalc/request-sdk":
+  version "0.0.14"
+  dependencies:
+    axios "^0.27.2"
+
 "request-sdk@file:.yalc/request-sdk":
-  version "0.0.12"
+  version "0.0.14"
   dependencies:
     axios "^0.27.2"
 

@@ -654,6 +654,7 @@ export default class HdWallet {
   } {
     const privateKey = this.getPathPrivateKey(keyPath);
     const address = privateKey.toAddress(this.network).toString();
+
     return {
       address: address,
       publicKey: privateKey.toPublicKey(),
@@ -1424,6 +1425,7 @@ export default class HdWallet {
         utxos: [],
         useFeeb: DEFAULTS.feeb,
       };
+
       const initOption = {
         isBroadcast: true,
         chain: HdWalletChain.MVC,

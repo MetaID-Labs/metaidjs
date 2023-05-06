@@ -1,6 +1,6 @@
 {
   "name": "@metaso/metaidjs",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "main": "dist/metaid.cjs.js",
   "module": "dist/metaid.esm.js",
   "browser": "dist/metaid.umd.js",
@@ -8,12 +8,13 @@
   "type": "module",
   "typings": "src/main.ts",
   "scripts": {
-    "dev": "node_modules/.bin/rollup -w -c ./rollup.config.dev.js --environment ENV:testnet",
+    "start": "ts-node-esm --skipIgnore src/main.ts",
+    "dev": "node_modules/.bin/rollup -w -c ./rollup.config.dev.js",
     "test": "cross-env TS_NODE_PROJECT='test/tsconfig.test.json' mocha test/**/**.ts",
     "release": "standard-version",
-    "build": "rollup -c -m rollup.config.js",
+    "build": "rollup -c rollup.config.js",
     "build:watch": "rollup -c rollup.config.js --watch",
-    "build:prod": "NODE_ENV=production rollup -c rollup.config.js --environment ENV:mainnet"
+    "build:prod": "NODE_ENV=production rollup -c rollup.config.js"
   },
   "mocha": {
     "require": [
@@ -29,6 +30,7 @@
     "crypto-es": "^1.2.7",
     "dexie": "^3.2.3",
     "meta-contract": "^0.3.25",
+    "metaid-provider": "file:.yalc/metaid-provider",
     "mvc-lib": "^1.0.5",
     "pkg": "^5.8.1",
     "request-sdk": "file:.yalc/request-sdk",

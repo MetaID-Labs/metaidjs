@@ -14,6 +14,11 @@ declare interface CreateNodeBaseRes {
   utxo?: UtxoItem;
 }
 
+declare interface AddressPathItem {
+  address: string;
+  path: number;
+}
+
 declare interface CreateNodeMetaFileRes extends CreateNodeBaseRes {
   sha256: string;
 }
@@ -41,6 +46,11 @@ declare interface PayToItem {
 declare enum IsEncrypt {
   Yes = 1,
   No = 0,
+}
+
+declare interface MetaIdType {
+  infoTxId: string;
+  protocolTxId: string;
 }
 
 declare interface AttachmentItem {
@@ -77,6 +87,7 @@ declare interface NodeTransactions {
   currentNode?: CreateNodeBaseRes;
   sendMoney?: CreateNodeBaseRes;
   subscribeId?: string;
+  scriptPlayload?: any;
   nft?: {
     issue?: {
       transaction: mvc.Transaction;

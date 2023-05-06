@@ -1,6 +1,7 @@
 import { v1 as UUID } from "uuid";
 import AllNodeName from "./AllNodeName";
 import { GetMetafileBySha256 } from "@/api/api";
+
 import { GetTx } from "@/api/metaid-base";
 import { Transaction } from "dexie";
 import HdWallet from "@/utils/wallet/hd-wallet";
@@ -35,6 +36,7 @@ export class SDK {
     [NodeName.NftCancel]: "cancel",
     [NodeName.nftBuy]: "buy",
   };
+
   constructor(network: any) {
     this.network = network;
   }
