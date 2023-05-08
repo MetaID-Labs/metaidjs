@@ -1,6 +1,6 @@
 // @ts-ignore
+//import { mvc } from "meta-contract";
 import mvc from "mvc-lib";
-
 // @ts-ignore
 import { Utf8 } from "crypto-es/lib/core.js";
 // @ts-ignore
@@ -19,6 +19,11 @@ import * as ECIES from "mvc-lib/ecies";
 import { Network } from "@/enum";
 import englishWords from "@/utils/wallet/englishWord";
 import Env from "@/config/config";
+import Compressor from "compressorjs";
+// @ts-ignore
+import CryptoJs from "crypto-js";
+// @ts-ignore
+import encHex from "crypto-js/enc-hex";
 // 是否邮箱
 export function isEmail(email = "") {
   const emailReg = new RegExp(
@@ -74,7 +79,7 @@ export const hdWalletFromMnemonic = async (
   const seed = bip39.mnemonicToSeedSync(mnemonic);
 
   const hdPrivateKey = mvc.HDPrivateKey.fromSeed(seed, network);
-
+  console.log("hdPrivateKey", hdPrivateKey);
   const hdWallet = hdPrivateKey.deriveChild(`m/44'/${path}'/0'`);
   return hdWallet;
 };
@@ -181,6 +186,7 @@ export function eciesDecryptData(
   publicKey?: string
 ): string {
   publicKey = publicKey || data.toString().substring(8, 74);
+  //const ECIES = new mvc.ECIES();
   let ecies = ECIES().privateKey(privateKey).publicKey(publicKey);
   if (!Buffer.isBuffer(data)) {
     data = Buffer.from(data, "hex");
@@ -190,6 +196,7 @@ export function eciesDecryptData(
     res = ecies.decrypt(data).toString();
   } catch (error) {
     try {
+      //const ECIES = new mvc.ECIES({ noKey: true });
       ecies = ECIES({ noKey: true })
         .privateKey(privateKey)
         .publicKey(publicKey);
@@ -218,3 +225,57 @@ export const createMnemonic = (address: string) => {
   mnemonic = bip39.entropyToMnemonic(hex, englishWords);
   return mnemonic;
 };
+
+export async function compressImage(image: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    new Compressor(image, {
+      quality: 0.6,
+      convertSize: 100_000, // 100KB
+      success: resolve as () => File,
+      error: reject,
+    });
+  });
+}
+
+// 降文件转为 AttachmentItem， 便于操作/上链
+export function FileToAttachmentItem(
+  file: File,
+  encrypt: IsEncrypt = IsEncrypt.No
+) {
+  return new Promise<AttachmentItem>(async (resolve, reject) => {
+    function readResult(blob: Blob) {
+      return new Promise<void>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // @ts-ignore
+          const wordArray = CryptoJs.lib.WordArray.create(reader.result);
+          // @ts-ignore
+          const buffer = Buffer.from(reader.result);
+          hex += buffer.toString("hex"); // 更新hex
+          // 增量更新计算结果
+          sha256Algo.update(wordArray); // 更新hash
+          resolve();
+        };
+        reader.readAsArrayBuffer(blob);
+      });
+    }
+    // 分块读取，防止内存溢出，这里设置为20MB,可以根据实际情况进行配置
+    const chunkSize = 20 * 1024 * 1024;
+
+    let hex = ""; // 二进制
+    const sha256Algo = CryptoJs.algo.SHA256.create();
+
+    for (let index = 0; index < file.size; index += chunkSize) {
+      await readResult(file.slice(index, index + chunkSize));
+    }
+    resolve({
+      data: hex,
+      fileName: file.name,
+      fileType: file.type,
+      sha256: encHex.stringify(sha256Algo.finalize()),
+      url: URL.createObjectURL(file),
+      encrypt,
+      size: file.size,
+    });
+  });
+}

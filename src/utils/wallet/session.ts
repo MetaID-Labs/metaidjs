@@ -1,4 +1,5 @@
 // @ts-ignore
+//import { mvc } from "meta-contract";
 import mvc from "mvc-lib";
 import HdWallet from "@/utils/wallet/hd-wallet";
 interface AddressPathItem {
@@ -49,7 +50,7 @@ export class Session {
       return item;
     } else {
       for (let i = 0; i <= 10000; i++) {
-        const _address = this.wallet!.deriveChild(`m/0/${i}`)
+        const _address = this.wallet!.wallet.deriveChild(`m/0/${i}`)
           .privateKey.toAddress()
           .toString();
         if (_address === address) {

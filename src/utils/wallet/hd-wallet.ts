@@ -1,5 +1,6 @@
 //@ts-ignore
 import mvc from "mvc-lib";
+//import { mvc, Message } from "meta-contract";
 // @ts-ignore
 import { Message } from "mvc-lib";
 // // @ts-ignore
@@ -115,6 +116,7 @@ export default class HdWallet {
     const root = wallet.deriveChild(0).deriveChild(0).privateKey;
     this._root = root;
     this.session = new Session(this.wallet);
+    console.log("this.wallet", this.wallet);
     if (!params) {
       params = {};
     }
@@ -432,7 +434,7 @@ export default class HdWallet {
               // 创建 eth brfc节点 brfcId = ehtAddress
               const privateKey = this.getPathPrivateKey("0/6");
               const node: NewNodeBaseInfo = {
-                address: privateKey.toAddress().toString(),
+                address: privateKey.toAddress(this.network).toString(),
                 publicKey: privateKey.toPublicKey().toString(),
                 path: "0/6",
               };
@@ -578,7 +580,7 @@ export default class HdWallet {
               // @ts-ignore
               const _privateKey = new mvc.PrivateKey(undefined, this.network);
               const _publickey = _privateKey.toPublicKey().toString();
-              const _address = _privateKey.toAddress().toString();
+              const _address = _privateKey.toAddress(this.network).toString();
               node = {
                 address: _address,
                 publicKey: _publickey,
@@ -928,6 +930,7 @@ export default class HdWallet {
   ): Buffer {
     privateKey = privateKey || this.getPathPrivateKey("0/0");
     publicKey = publicKey || this.getPathPrivateKey("0/0").toPublicKey();
+    //const ECIES = new mvc.ECIES();
     const ecies = ECIES().privateKey(privateKey).publicKey(publicKey);
     return ecies.encrypt(data);
   }
@@ -942,6 +945,7 @@ export default class HdWallet {
   ): string {
     privateKey = privateKey || this.getPathPrivateKey("0/0");
     publicKey = publicKey || data.toString().substring(8, 74);
+    //const ECIES = new mvc.ECIES();
     let ecies = ECIES().privateKey(privateKey).publicKey(publicKey);
     if (!Buffer.isBuffer(data)) {
       data = Buffer.from(data, "hex");
@@ -951,6 +955,7 @@ export default class HdWallet {
       res = ecies.decrypt(data).toString();
     } catch (error) {
       try {
+        //const ECIES = new mvc.ECIES({ noKey: true });
         ecies = ECIES({ noKey: true })
           .privateKey(privateKey)
           .publicKey(publicKey);
@@ -1454,7 +1459,7 @@ export default class HdWallet {
           // @ts-ignore
           const privateKey = new mvc.PrivateKey(undefined, this.network);
           publickey = privateKey.toPublicKey().toString();
-          address = privateKey.toAddress().toString();
+          address = privateKey.toAddress(this.network).toString();
         }
         const node: NewNodeBaseInfo = {
           address,

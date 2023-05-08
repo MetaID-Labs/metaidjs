@@ -4,6 +4,7 @@ import { ApiBaseParams } from "@/types/common";
 import { UtxoItem } from "@/types/utxo";
 //@ts-ignore
 import mvc from "mvc-lib";
+//import { mvc } from "meta-contract";
 import BaseApi from "./base";
 import { AddressConstructorParams } from "@/types/address";
 

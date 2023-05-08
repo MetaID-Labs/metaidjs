@@ -15,6 +15,7 @@ import {
 } from "@/enum";
 // @ts-ignore
 import mvc from "mvc-lib";
+//import { mvc } from "meta-contract";
 export const DEFAULTS = {
   feeb: 1,
   minAmount: 546,

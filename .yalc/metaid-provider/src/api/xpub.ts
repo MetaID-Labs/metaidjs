@@ -5,6 +5,7 @@ import BaseApi from "./base";
 import { XpubConstructorParams } from "@/types/xpub";
 // @ts-ignore
 import mvc from "mvc-lib";
+//import { mvc } from "meta-contract";
 
 export default class Xpub extends BaseApi {
   constructor(params: XpubConstructorParams) {

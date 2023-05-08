@@ -1,6 +1,6 @@
 {
   "name": "metaid-provider",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "description": "metaid provider sdk",
   "main": "dist/metaid-provider-sdk.min.js",
   "typings": "src/index.ts",
@@ -17,8 +17,9 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.27.2",
+    "meta-contract": "^0.3.28",
     "mvc-lib": "^1.0.5",
     "request-sdk": "file:.yalc/request-sdk"
   },
-  "yalcSig": "480ed5ffcc1c2da16959d571002c2cbf"
+  "yalcSig": "54dbc23ed7b773e01db076f08e5de372"
 }

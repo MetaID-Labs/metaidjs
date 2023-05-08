@@ -16,25 +16,32 @@ const customResolver = resolve({
 export default {
     input: "./src/main.ts",
     output: [
-        {
-            file: "./dist/metaid.cjs.js",
-            format: "commonjs",
-            name: "metaidjs",
-            sourcemap: true,
-        },
-        {
-            file: "./dist/metaid.esm.js",
-            format: "es",
-            name: "metaidjs",
-            sourcemap: true,
-        },
+        // {
+        //     file: "./dist/metaid.cjs.js",
+        //     format: "commonjs",
+        //     name: "metaidjs",
+        //     sourcemap: true,
+        // },
         {
             file: "./dist/metaid.umd.js",
             format: "umd",
             name: "metaidjs",
-            sourcemap: true,
+            //sourcemap: true,
+
+            // globals: {
+            //     mvc: "mvc-lib",
+            //     ["mvc-lib/ecies"]: "ECIES",
+            //     ["mvc-lib/mnemonic"]: "Mnemonic",
+            // },
         },
+        // {
+        //     file: "./dist/metaid.umd.js",
+        //     format: "umd",
+        //     name: "metaidjs",
+        //     sourcemap: true,
+        // },
     ],
+    //external: ["mvc-lib"],
     plugins: [
         builtins(),
         alias({
@@ -77,7 +84,7 @@ export default {
             ["mvc-lib"]: "mvc",
             ["mvc-lib/ecies"]: "ECIES",
             ["mvc-lib/mnemonic"]: "Mnemonic",
-            bip39: "bip39",
+            //bip39: "bip39",
         }),
     ],
 };

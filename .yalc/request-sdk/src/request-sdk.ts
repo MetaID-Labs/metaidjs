@@ -1,5 +1,5 @@
 import type { AxiosResponse, AxiosRequestConfig } from "axios";
-import axios from "axios";
+const axios = require("axios");
 export default class HttpRequest {
   request;
   constructor(

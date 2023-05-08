@@ -10,6 +10,7 @@ import {
 import AllNodeName from "@/utils/AllNodeName";
 // @ts-ignore
 import mvc from "mvc-lib";
+//import { mvc } from "meta-contract";
 import { isEmail, isNaturalNumber, hdWalletFromMnemonic } from "@/utils";
 import { MetaIdProvider } from "metaid-provider";
 import { BaseApiConstructorParams } from "metaid-provider/src/api/base";
@@ -24,7 +25,7 @@ export const DEFAULTS = {
 export const DUST_AMOUNT = 546;
 
 export const isBrowserEnv = typeof window === "undefined" ? false : true;
-
+console.log("isBrowserEnv", isBrowserEnv);
 export class MetaIDSdk {
   mnemonic: string = `market pole juice jazz soda before slow never youth mutual figure climb`;
   bfrcNodeList: { nodeName: NodeName; data: CreateNodeBrfcRes }[] = []; // 存储Brfc节点， 防止未广播时重复构建
@@ -107,7 +108,7 @@ export class MetaIDSdk {
   get rootAddress() {
     return this.wallet!.wallet.deriveChild(0)
       .deriveChild(0)
-      .privateKey.toAddress()
+      .privateKey.toAddress(this.network)
       .toString();
   }
   get xpubkey() {
@@ -165,13 +166,7 @@ export class MetaIDSdk {
   public async build_meta_data(params: BuildMetaDataPramas) {
     const buzz = await this.createBrfcChildNode({
       nodeName: params.metaData.nodeName,
-      data: JSON.stringify({
-        content: `Test metaidjs in testnet ${+Date.now()} new`,
-        contentType: "text/plain",
-        quoteTx: params.txId,
-        attachments: params.attachments,
-        mention: [],
-      }),
+      data: params.metaData.data,
     }).catch((error) => {
       console.log(error);
     });
@@ -291,6 +286,7 @@ export class MetaIDSdk {
           // 广播
           if (option?.isBroadcast) {
             // 广播 transactions 所有交易
+            console.log("transactions", transactions);
             await this.broadcastNodeTransactions(transactions);
           }
 
@@ -354,7 +350,7 @@ export class MetaIDSdk {
           // @ts-ignore
           const privateKey = new mvc.PrivateKey(undefined, this.network);
           publickey = privateKey.toPublicKey().toString();
-          address = privateKey.toAddress().toString();
+          address = privateKey.toAddress(this.network).toString();
         }
         const node: NewNodeBaseInfo = {
           address,
@@ -802,7 +798,7 @@ export class MetaIDSdk {
               // @ts-ignore
               const _privateKey = new mvc.PrivateKey(undefined, this.network);
               const _publickey = _privateKey.toPublicKey().toString();
-              const _address = _privateKey.toAddress().toString();
+              const _address = _privateKey.toAddress(this.network).toString();
               node = {
                 address: _address,
                 publicKey: _publickey,
@@ -1051,7 +1047,7 @@ export class MetaIDSdk {
     } else {
       for (let i = 0; i <= 10000; i++) {
         const _address = this.wallet!.wallet.deriveChild(`m/0/${i}`)
-          .privateKey.toAddress()
+          .privateKey.toAddress(this.network)
           .toString();
         if (_address === address) {
           console.log("path", i);
@@ -1249,7 +1245,7 @@ export class MetaIDSdk {
           const allUtxos = await this.metaidProvider.xpub.getUtxo(
             this.xpubkey.toString()
           );
-          debugger;
+
           const useUtxos = [];
           if (allUtxos && allUtxos?.length > 0) {
             // 总价加个 最小金额  给转账费用
@@ -1710,6 +1706,18 @@ export class MetaIDSdk {
     const privateKeys = this.getUtxosPrivateKeys(utxos);
     // @ts-ignore
     tx.sign(privateKeys);
+  }
+
+  public getAttachmentsMark(attachments: (AttachmentItem | string)[]) {
+    let result = [];
+    for (let i = 0; i < attachments.length; i++) {
+      if (typeof attachments[i] === "string") {
+        result.push(attachments[i]);
+      } else {
+        result.push(`metafile://$[${i}]`);
+      }
+    }
+    return result;
   }
 
   public getUtxosPrivateKeys(utxos: UtxoItem[]): mvc.PrivateKey[] {
