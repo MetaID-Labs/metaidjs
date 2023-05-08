@@ -27,7 +27,7 @@ export const DUST_AMOUNT = 546;
 export const isBrowserEnv = typeof window === "undefined" ? false : true;
 console.log("isBrowserEnv", isBrowserEnv);
 export class MetaIDSdk {
-  mnemonic: string = `market pole juice jazz soda before slow never youth mutual figure climb`;
+  mnemonic: string = ``;
   bfrcNodeList: { nodeName: NodeName; data: CreateNodeBrfcRes }[] = []; // 存储Brfc节点， 防止未广播时重复构建
   metaFileSha256TxIdList: { sha256: string; txId: string }[] = []; // 存储metaFileSha256TxId， 防止未广播时重复构建
   network = Network.testnet;
@@ -97,6 +97,10 @@ export class MetaIDSdk {
     // wallet: HdWallet;
   }) {
     // this.xpubkey = params.xpubkey;
+
+    if (!this.mnemonic) {
+      throw new Error(`mnemonic is required`);
+    }
     this.network = params.network;
     this.metasvApi = params.providerApi.base!.metaSvBaseUrl!;
     // this.rootAddress = params.rootAddress;
