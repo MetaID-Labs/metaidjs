@@ -10,6 +10,7 @@ import json from "@rollup/plugin-json";
 import externalGlobals from "rollup-plugin-external-globals";
 import replace from "@rollup/plugin-replace";
 import nodeResolve from "@rollup/plugin-node-resolve";
+
 const customResolver = resolve({
     extensions: [".mjs", ".js", ".jsx", ".json", ".sass", ".scss"],
 });
@@ -59,6 +60,7 @@ export default {
             main: true,
             brower: true,
         }),
+
         commonjs({
             namedExports: { tslib: ["__awaiter", "__generator"] },
         }),

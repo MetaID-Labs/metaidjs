@@ -31,6 +31,7 @@ export class MetaIDSdk {
   bfrcNodeList: { nodeName: NodeName; data: CreateNodeBrfcRes }[] = []; // 存储Brfc节点， 防止未广播时重复构建
   metaFileSha256TxIdList: { sha256: string; txId: string }[] = []; // 存储metaFileSha256TxId， 防止未广播时重复构建
   network = Network.testnet;
+  metaidWallet: any = null;
   MetaIdTag: MetaidTag = MetaidTag.test;
   addressSessionKey = "AddressPath";
   addressPaths: AddressPathItem[] = isBrowserEnv
@@ -94,13 +95,15 @@ export class MetaIDSdk {
     // rootAddress: string;
     // xpubkey: string;
     providerApi: BaseApiConstructorParams;
+    metaidWallet?: any;
     // wallet: HdWallet;
   }) {
     // this.xpubkey = params.xpubkey;
 
-    if (!this.mnemonic) {
-      throw new Error(`mnemonic is required`);
-    }
+    // if (!this.mnemonic) {
+    //   throw new Error(`mnemonic is required`);
+    // }
+    this.metaidWallet = params.metaidWallet;
     this.network = params.network;
     this.metasvApi = params.providerApi.base!.metaSvBaseUrl!;
     // this.rootAddress = params.rootAddress;
@@ -269,11 +272,15 @@ export class MetaIDSdk {
             debugger;
             if (option!.isBroadcast) {
               // 广播 打钱操作
+              console.log("打钱");
+              debugger;
               if (payToRes && payToRes.transaction) {
                 await this.metaidProvider.tx.broadcast(
                   payToRes.transaction.toString()
                 );
               }
+              console.log("广播剩余交易");
+              debugger;
               // 广播 transactions 所有交易
               await this.broadcastNodeTransactions(transactions);
             }
@@ -291,6 +298,7 @@ export class MetaIDSdk {
           if (option?.isBroadcast) {
             // 广播 transactions 所有交易
             console.log("transactions", transactions);
+            debugger;
             await this.broadcastNodeTransactions(transactions);
           }
 
@@ -393,7 +401,7 @@ export class MetaIDSdk {
         });
         if (res) {
           if (option.isBroadcast) {
-            console.log("res", res);
+            console.log("创建BRFC节点", res);
             debugger;
             const response = await this.metaidProvider.tx.broadcast(
               res.transaction!.toString()
@@ -467,7 +475,7 @@ export class MetaIDSdk {
           //  处理当前节点
           if (params.nodeName !== NodeName.MetaFile) {
             // 当前节点的brfc 节点
-
+            debugger;
             if (params.publickey && params.txId) {
               // 修改
               const res = await this.metaidProvider.tx.getTx(params.txId);
@@ -487,6 +495,7 @@ export class MetaIDSdk {
               }
             } else {
               // 新增
+              debugger;
               transactions.currentNodeBrfc = await this.getBrfcNode(
                 {
                   nodeName: params.nodeName,
@@ -668,9 +677,12 @@ export class MetaIDSdk {
           tx.from(utxos);
         }
         tx.fee(Math.ceil(tx._estimateSize() * useFeeb));
+
         const privateKeys = this.getUtxosPrivateKeys(utxos);
         // @ts-ignore
         tx.sign(privateKeys);
+        console.log("tx", tx);
+        debugger;
         resolve(tx);
       } catch (error) {
         reject(error);
@@ -873,12 +885,34 @@ export class MetaIDSdk {
     });
   }
 
+  private txSignatrue(signatureInfo: any) {
+    const pureSig = mvc.crypto.Signature!.fromTxFormat(
+      Buffer.from(signatureInfo.sig),
+      "hex"
+    );
+    const txSignature = mvc.Transaction!.Signature.fromObject({
+      publicKey: signatureInfo.publicKey,
+      prevTxId: tx.inputs[0].prevTxId,
+      outputIndex: tx.inputs[0].outputIndex,
+      inputIndex: 0,
+      signature: pureSig,
+      sigtype: signatureInfo.sigtype,
+    });
+    const signedScript = mvc.Script.buildPublicKeyHashIn(
+      txSignature.publicKey,
+      txSignature.signature.toDER(),
+      txSignature.sigtype
+    );
+    tx.inputs[0].setScript(signedScript);
+  }
+
   private getBrfcNode(
     params: CreateBrfcNodeParams,
     option?: { isBroadcast?: boolean; chain?: HdWalletChain }
   ) {
     return new Promise<CreateNodeBrfcRes>(async (resolve, reject) => {
       try {
+        debugger;
         if (
           this.bfrcNodeList.some((item) => item.nodeName === params.nodeName)
         ) {
@@ -887,6 +921,7 @@ export class MetaIDSdk {
               .data
           );
         } else {
+          debugger;
           const currentNodeBrfc = await this.createBrfcNode(params, option);
           this.bfrcNodeList.push({
             nodeName: params.nodeName,
@@ -969,6 +1004,7 @@ export class MetaIDSdk {
           });
           if (protocolRoot) {
             if (option.isBroadcast) {
+              console.log("创建协议根节点");
               await this.metaidProvider.tx.broadcast(
                 protocolRoot.transaction.toString(),
                 option!.chain
@@ -1630,7 +1666,7 @@ export class MetaIDSdk {
                 }
               );
               if (res) transactions.currentNode = res;
-
+              debugger;
               this.setTransferUtxoAndOutputAndSign(
                 transactions.currentNode!.transaction,
                 [utxo],
@@ -1710,6 +1746,8 @@ export class MetaIDSdk {
     const privateKeys = this.getUtxosPrivateKeys(utxos);
     // @ts-ignore
     tx.sign(privateKeys);
+    console.log("tx", tx);
+    debugger;
   }
 
   public getAttachmentsMark(attachments: (AttachmentItem | string)[]) {

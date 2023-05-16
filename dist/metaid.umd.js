@@ -1,3 +1,5 @@
+
+(function(l, r) { if (!l || l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (self.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(self.document);
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
     typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -52879,6 +52881,9 @@
     	  }, {
     	    name: 'InvalidBuffer',
     	    message: 'Invalid script buffer: can\'t parse valid script from given buffer {0}'
+    	  }, {
+    	    name: 'InvalidOpcode',
+    	    message: 'Invalid Opcode: got "{0}"'
     	  }]
     	}, {
     	  name: 'HDPrivateKey',
@@ -52980,21 +52985,21 @@
     	  return parent
     	};
 
-    	var mvc = {};
-    	mvc.Error = function () {
+    	var bsv = {};
+    	bsv.Error = function () {
     	  this.message = 'Internal error';
     	  this.stack = this.message + '\n' + (new Error()).stack;
     	};
-    	mvc.Error.prototype = Object.create(Error.prototype);
-    	mvc.Error.prototype.name = 'mvc.Error';
+    	bsv.Error.prototype = Object.create(Error.prototype);
+    	bsv.Error.prototype.name = 'bsv.Error';
 
     	var data = requireSpec();
-    	traverseRoot(mvc.Error, data);
+    	traverseRoot(bsv.Error, data);
 
-    	errors.exports = mvc.Error;
+    	errors.exports = bsv.Error;
 
     	errors.exports.extend = function (spec) {
-    	  return traverseNode(mvc.Error, spec)
+    	  return traverseNode(bsv.Error, spec)
     	};
     	return errors.exports;
     }
@@ -53231,7 +53236,6 @@
     	 * @param {number} size The maximum size.
     	 */
     	BN.fromScriptNumBuffer = function (buf, fRequireMinimal, size) {
-    	  // don't limit numSize default
     	  var nMaxNumSize = size || Number.MAX_SAFE_INTEGER;
     	  $.checkArgument(buf.length <= nMaxNumSize, new Error('script number overflow'));
     	  if (fRequireMinimal && buf.length > 0) {
@@ -63196,7 +63200,17 @@
 
     		Hash.sha256.blocksize = 512;
 
-
+    		/**
+    		 * A double SHA256 hash, which is always 256 bits or 32 bytes bytes long. This
+    		 * hash function is commonly used inside Bitcoin, particularly for the hash of a
+    		 * block and the hash of a transaction.
+    		 *
+    		 * See:
+    		 * https://www.movable-type.co.uk/scripts/sha256.html
+    		 *
+    		 * @param {Buffer} buf Data, a.k.a. pre-image, which can be any size.
+    		 * @returns {Buffer} The hash in the form of a buffer.
+    		 */
     		Hash.sha256sha256 = function (buf) {
     		  $.checkArgument(isBuffer$2(buf));
     		  return Hash.sha256(Hash.sha256(buf))
@@ -63215,7 +63229,17 @@
     		  $.checkArgument(isBuffer$2(buf));
     		  return Buffer$1.from(hash.ripemd160().update(buf).digest('hex'), 'hex')
     		};
-
+    		/**
+    		 * A RIPEMD160 hash of a SHA256 hash, which is always 160 bits or 20 bytes long.
+    		 * This value is commonly used inside Bitcoin, particularly for Bitcoin
+    		 * addresses.
+    		 *
+    		 * See:
+    		 * https://en.wikipedia.org/wiki/RIPEMD
+    		 *
+    		 * @param {Buffer} buf Data, a.k.a. pre-image, which can be any size.
+    		 * @returns {Buffer} The hash in the form of a buffer.
+    		 */
     		Hash.sha256ripemd160 = function (buf) {
     		  $.checkArgument(isBuffer$2(buf));
     		  return Hash.ripemd160(Hash.sha256(buf))
@@ -63516,7 +63540,7 @@
     	  NETWORK_MAGIC: networkMagic.stn,
     	  DNS_SEEDS: ['stn-seed.bitcoinsv.io'],
     	  PREFIX: 'stn',
-    	  CASHADDRPREFIX: 'mvcstn'
+    	  CASHADDRPREFIX: 'bsvstn'
     	};
 
     	var liveNetwork = {
@@ -64177,212 +64201,147 @@
 
     var script$1 = {exports: {}};
 
-    var bufferreader;
-    var hasRequiredBufferreader;
+    var writeU8Le;
+    var hasRequiredWriteU8Le;
 
-    function requireBufferreader () {
-    	if (hasRequiredBufferreader) return bufferreader;
-    	hasRequiredBufferreader = 1;
+    function requireWriteU8Le () {
+    	if (hasRequiredWriteU8Le) return writeU8Le;
+    	hasRequiredWriteU8Le = 1;
+    	function writeU8LE (writer, n) {
+    	  if (n > 0xff) throw new Error('number too large')
+    	  const buffer = new Uint8Array(1);
+    	  buffer[0] = n;
+    	  return writer.write(buffer)
+    	}
 
-    	var _ = require_();
-    	var $ = requirePreconditions();
-    	var BN = requireBn$1();
+    	writeU8Le = writeU8LE;
+    	return writeU8Le;
+    }
 
-    	var BufferReader = function BufferReader (buf) {
-    	  if (!(this instanceof BufferReader)) {
-    	    return new BufferReader(buf)
+    var writeU16Le;
+    var hasRequiredWriteU16Le;
+
+    function requireWriteU16Le () {
+    	if (hasRequiredWriteU16Le) return writeU16Le;
+    	hasRequiredWriteU16Le = 1;
+    	function writeU16LE (writer, n) {
+    	  if (n > 0xffff) throw new Error('number too large')
+
+    	  const buffer = new Uint8Array(2);
+    	  buffer[0] = n % 256;
+    	  n = n >> 8;
+    	  buffer[1] = n % 256;
+
+    	  return writer.write(buffer)
+    	}
+
+    	writeU16Le = writeU16LE;
+    	return writeU16Le;
+    }
+
+    var writeU32Le;
+    var hasRequiredWriteU32Le;
+
+    function requireWriteU32Le () {
+    	if (hasRequiredWriteU32Le) return writeU32Le;
+    	hasRequiredWriteU32Le = 1;
+    	function writeU32LE (writer, n) {
+    	  if (n > 0xffffffff) throw new Error('number too large')
+
+    	  const buffer = new Uint8Array(4);
+    	  buffer[0] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[1] = n % 256;
+    	  n = n >> 8;
+    	  buffer[2] = n % 256;
+    	  n = n >> 8;
+    	  buffer[3] = n;
+
+    	  return writer.write(buffer)
+    	}
+
+    	writeU32Le = writeU32LE;
+    	return writeU32Le;
+    }
+
+    var writeI32Le;
+    var hasRequiredWriteI32Le;
+
+    function requireWriteI32Le () {
+    	if (hasRequiredWriteI32Le) return writeI32Le;
+    	hasRequiredWriteI32Le = 1;
+    	function writeI32LE (writer, n) {
+    	  if (n < -2147483648 || n > 2147483647) throw new Error('Out of range. It must be >= -2147483648 and <= 2147483647.')
+
+    	  const buffer = new Uint8Array(4);
+    	  buffer[0] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[1] = n % 256;
+    	  n = n >> 8;
+    	  buffer[2] = n % 256;
+    	  n = n >> 8;
+    	  buffer[3] = n;
+
+    	  return writer.write(buffer)
+    	}
+
+    	writeI32Le = writeI32LE;
+    	return writeI32Le;
+    }
+
+    var writeVarint_1;
+    var hasRequiredWriteVarint;
+
+    function requireWriteVarint () {
+    	if (hasRequiredWriteVarint) return writeVarint_1;
+    	hasRequiredWriteVarint = 1;
+    	function writeVarint (writer, n) {
+    	  if (n > Number.MAX_SAFE_INTEGER) throw new Error('varint too large')
+
+    	  if (n <= 0xfc) {
+    	    return writer.write([n])
     	  }
-    	  if (_.isUndefined(buf)) {
-    	    return
+
+    	  if (n <= 0xffff) {
+    	    return writer.write([0xfd, n % 256, Math.floor(n / 256)])
     	  }
-    	  if (isBuffer$2(buf)) {
-    	    this.set({
-    	      buf: buf
-    	    });
-    	  } else if (_.isString(buf)) {
-    	    var b = Buffer$1.from(buf, 'hex');
-    	    if (b.length * 2 !== buf.length) { throw new TypeError('Invalid hex string') }
 
-    	    this.set({
-    	      buf: b
-    	    });
-    	  } else if (_.isObject(buf)) {
-    	    var obj = buf;
-    	    this.set(obj);
-    	  } else {
-    	    throw new TypeError('Unrecognized argument for BufferReader')
+    	  if (n <= 0xffffffff) {
+    	    const buffer = new Uint8Array(5);
+    	    buffer[0] = 0xfe;
+    	    buffer[1] = n % 256;
+    	    n = Math.floor(n / 256);
+    	    buffer[2] = n % 256;
+    	    n = Math.floor(n / 256);
+    	    buffer[3] = n % 256;
+    	    n = Math.floor(n / 256);
+    	    buffer[4] = n;
+    	    return writer.write(buffer)
     	  }
-    	};
 
-    	BufferReader.prototype.set = function (obj) {
-    	  this.buf = obj.buf || this.buf || undefined;
-    	  this.pos = obj.pos || this.pos || 0;
-    	  return this
-    	};
+    	  // n <= 0xffffffffffffffff
+    	  const buffer = new Uint8Array(9);
+    	  buffer[0] = 0xff;
+    	  buffer[1] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[2] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[3] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[4] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[5] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[6] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[7] = n % 256;
+    	  n = Math.floor(n / 256);
+    	  buffer[8] = n;
+    	  return writer.write(buffer)
+    	}
 
-    	BufferReader.prototype.eof = function () {
-    	  return this.pos >= this.buf.length
-    	};
-
-    	BufferReader.prototype.finished = BufferReader.prototype.eof;
-
-    	BufferReader.prototype.read = function (len) {
-    	  $.checkArgument(!_.isUndefined(len), 'Must specify a length');
-    	  var buf = this.buf.slice(this.pos, this.pos + len);
-    	  this.pos = this.pos + len;
-    	  return buf
-    	};
-
-    	BufferReader.prototype.readAll = function () {
-    	  var buf = this.buf.slice(this.pos, this.buf.length);
-    	  this.pos = this.buf.length;
-    	  return buf
-    	};
-
-    	BufferReader.prototype.readUInt8 = function () {
-    	  var val = this.buf.readUInt8(this.pos);
-    	  this.pos = this.pos + 1;
-    	  return val
-    	};
-
-    	BufferReader.prototype.readUInt16BE = function () {
-    	  var val = this.buf.readUInt16BE(this.pos);
-    	  this.pos = this.pos + 2;
-    	  return val
-    	};
-
-    	BufferReader.prototype.readUInt16LE = function () {
-    	  var val = this.buf.readUInt16LE(this.pos);
-    	  this.pos = this.pos + 2;
-    	  return val
-    	};
-
-    	BufferReader.prototype.readUInt32BE = function () {
-    	  var val = this.buf.readUInt32BE(this.pos);
-    	  this.pos = this.pos + 4;
-    	  return val
-    	};
-
-    	BufferReader.prototype.readUInt32LE = function () {
-    	  var val = this.buf.readUInt32LE(this.pos);
-    	  this.pos = this.pos + 4;
-    	  return val
-    	};
-
-    	BufferReader.prototype.readInt32LE = function () {
-    	  var val = this.buf.readInt32LE(this.pos);
-    	  this.pos = this.pos + 4;
-    	  return val
-    	};
-
-    	BufferReader.prototype.readUInt64BEBN = function () {
-    	  var buf = this.buf.slice(this.pos, this.pos + 8);
-    	  var bn = BN.fromBuffer(buf);
-    	  this.pos = this.pos + 8;
-    	  return bn
-    	};
-
-    	BufferReader.prototype.readUInt64LEBN = function () {
-    	  var second = this.buf.readUInt32LE(this.pos);
-    	  var first = this.buf.readUInt32LE(this.pos + 4);
-    	  var combined = (first * 0x100000000) + second;
-    	  // Instantiating an instance of BN with a number is faster than with an
-    	  // array or string. However, the maximum safe number for a double precision
-    	  // floating point is 2 ^ 52 - 1 (0x1fffffffffffff), thus we can safely use
-    	  // non-floating point numbers less than this amount (52 bits). And in the case
-    	  // that the number is larger, we can instatiate an instance of BN by passing
-    	  // an array from the buffer (slower) and specifying the endianness.
-    	  var bn;
-    	  if (combined <= 0x1fffffffffffff) {
-    	    bn = new BN(combined);
-    	  } else {
-    	    var data = Array.prototype.slice.call(this.buf, this.pos, this.pos + 8);
-    	    bn = new BN(data, 10, 'le');
-    	  }
-    	  this.pos = this.pos + 8;
-    	  return bn
-    	};
-
-    	BufferReader.prototype.readVarintNum = function () {
-    	  var first = this.readUInt8();
-    	  switch (first) {
-    	    case 0xFD:
-    	      return this.readUInt16LE()
-    	    case 0xFE:
-    	      return this.readUInt32LE()
-    	    case 0xFF:
-    	      var bn = this.readUInt64LEBN();
-    	      var n = bn.toNumber();
-    	      if (n <= Math.pow(2, 53)) {
-    	        return n
-    	      } else {
-    	        throw new Error('number too large to retain precision - use readVarintBN')
-    	      }
-    	      // break // unreachable
-    	    default:
-    	      return first
-    	  }
-    	};
-
-    	/**
-    	 * reads a length prepended buffer
-    	 */
-    	BufferReader.prototype.readVarLengthBuffer = function () {
-    	  var len = this.readVarintNum();
-    	  var buf = this.read(len);
-    	  $.checkState(buf.length === len, 'Invalid length while reading varlength buffer. ' +
-    	    'Expected to read: ' + len + ' and read ' + buf.length);
-    	  return buf
-    	};
-
-    	BufferReader.prototype.readVarintBuf = function () {
-    	  var first = this.buf.readUInt8(this.pos);
-    	  switch (first) {
-    	    case 0xFD:
-    	      return this.read(1 + 2)
-    	    case 0xFE:
-    	      return this.read(1 + 4)
-    	    case 0xFF:
-    	      return this.read(1 + 8)
-    	    default:
-    	      return this.read(1)
-    	  }
-    	};
-
-    	BufferReader.prototype.readVarintBN = function () {
-    	  var first = this.readUInt8();
-    	  switch (first) {
-    	    case 0xFD:
-    	      return new BN(this.readUInt16LE())
-    	    case 0xFE:
-    	      return new BN(this.readUInt32LE())
-    	    case 0xFF:
-    	      return this.readUInt64LEBN()
-    	    default:
-    	      return new BN(first)
-    	  }
-    	};
-
-    	BufferReader.prototype.reverse = function () {
-    	  var buf = Buffer$1.alloc(this.buf.length);
-    	  for (var i = 0; i < buf.length; i++) {
-    	    buf[i] = this.buf[this.buf.length - 1 - i];
-    	  }
-    	  this.buf = buf;
-    	  return this
-    	};
-
-    	BufferReader.prototype.readReverse = function (len) {
-    	  if (_.isUndefined(len)) {
-    	    len = this.buf.length;
-    	  }
-    	  var buf = this.buf.slice(this.pos, this.pos + len);
-    	  this.pos = this.pos + len;
-    	  return Buffer$1.from(buf).reverse()
-    	};
-
-    	bufferreader = BufferReader;
-    	return bufferreader;
+    	writeVarint_1 = writeVarint;
+    	return writeVarint_1;
     }
 
     var bufferwriter;
@@ -64394,150 +64353,136 @@
 
     	var assert = require$$4;
 
-    	var BufferWriter = function BufferWriter (obj) {
-    	  if (!(this instanceof BufferWriter)) { return new BufferWriter(obj) }
-    	  this.bufLen = 0;
-    	  if (obj) { this.set(obj); } else { this.bufs = []; }
-    	};
+    	const writeU8LE = requireWriteU8Le();
+    	const writeU16LE = requireWriteU16Le();
+    	const writeU32LE = requireWriteU32Le();
+    	const writeI32LE = requireWriteI32Le();
+    	const writeVarint = requireWriteVarint();
 
-    	BufferWriter.prototype.set = function (obj) {
-    	  this.bufs = obj.bufs || this.bufs || [];
-    	  this.bufLen = this.bufs.reduce(function (prev, buf) { return prev + buf.length }, 0);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.toBuffer = function () {
-    	  return this.concat()
-    	};
-
-    	BufferWriter.prototype.concat = function () {
-    	  return Buffer$1.concat(this.bufs, this.bufLen)
-    	};
-
-    	BufferWriter.prototype.write = function (buf) {
-    	  assert(isBuffer$2(buf));
-    	  this.bufs.push(buf);
-    	  this.bufLen += buf.length;
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeReverse = function (buf) {
-    	  assert(isBuffer$2(buf));
-    	  this.bufs.push(Buffer$1.from(buf).reverse());
-    	  this.bufLen += buf.length;
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt8 = function (n) {
-    	  var buf = Buffer$1.alloc(1);
-    	  buf.writeUInt8(n, 0);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt16BE = function (n) {
-    	  var buf = Buffer$1.alloc(2);
-    	  buf.writeUInt16BE(n, 0);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt16LE = function (n) {
-    	  var buf = Buffer$1.alloc(2);
-    	  buf.writeUInt16LE(n, 0);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt32BE = function (n) {
-    	  var buf = Buffer$1.alloc(4);
-    	  buf.writeUInt32BE(n, 0);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeInt32LE = function (n) {
-    	  var buf = Buffer$1.alloc(4);
-    	  buf.writeInt32LE(n, 0);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt32LE = function (n) {
-    	  var buf = Buffer$1.alloc(4);
-    	  buf.writeUInt32LE(n, 0);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt64BEBN = function (bn) {
-    	  var buf = bn.toBuffer({ size: 8 });
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeUInt64LEBN = function (bn) {
-    	  var buf = bn.toBuffer({ size: 8 });
-    	  this.writeReverse(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeVarintNum = function (n) {
-    	  var buf = BufferWriter.varintBufNum(n);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.prototype.writeVarintBN = function (bn) {
-    	  var buf = BufferWriter.varintBufBN(bn);
-    	  this.write(buf);
-    	  return this
-    	};
-
-    	BufferWriter.varintBufNum = function (n) {
-    	  var buf;
-    	  if (n < 253) {
-    	    buf = Buffer$1.alloc(1);
-    	    buf.writeUInt8(n, 0);
-    	  } else if (n < 0x10000) {
-    	    buf = Buffer$1.alloc(1 + 2);
-    	    buf.writeUInt8(253, 0);
-    	    buf.writeUInt16LE(n, 1);
-    	  } else if (n < 0x100000000) {
-    	    buf = Buffer$1.alloc(1 + 4);
-    	    buf.writeUInt8(254, 0);
-    	    buf.writeUInt32LE(n, 1);
-    	  } else {
-    	    buf = Buffer$1.alloc(1 + 8);
-    	    buf.writeUInt8(255, 0);
-    	    buf.writeInt32LE(n & -1, 1);
-    	    buf.writeUInt32LE(Math.floor(n / 0x100000000), 5);
+    	class BufferWriter {
+    	  constructor (obj) {
+    	    if (obj) { this.set(obj); } else {
+    	      this.buffers = [];
+    	      this.length = 0;
+    	    }
     	  }
-    	  return buf
-    	};
 
-    	BufferWriter.varintBufBN = function (bn) {
-    	  var buf;
-    	  var n = bn.toNumber();
-    	  if (n < 253) {
-    	    buf = Buffer$1.alloc(1);
-    	    buf.writeUInt8(n, 0);
-    	  } else if (n < 0x10000) {
-    	    buf = Buffer$1.alloc(1 + 2);
-    	    buf.writeUInt8(253, 0);
-    	    buf.writeUInt16LE(n, 1);
-    	  } else if (n < 0x100000000) {
-    	    buf = Buffer$1.alloc(1 + 4);
-    	    buf.writeUInt8(254, 0);
-    	    buf.writeUInt32LE(n, 1);
-    	  } else {
+    	  write (buffer) {
+    	    this.buffers.push(buffer);
+    	    this.length += buffer.length;
+    	    return this
+    	  }
+
+    	  set (obj) {
+    	    this.buffers = obj.buffers || obj.bufs || this.buffers || [];
+    	    this.length = this.buffers.reduce(function (prev, buf) { return prev + buf.length }, 0);
+    	    return this
+    	  }
+
+    	  concat () {
+    	    return this.toBuffer()
+    	  }
+
+    	  toBuffer () {
+    	    if (this.buffers.length === 1) {
+    	      return Buffer$1.from(this.buffers[0])
+    	    }
+
+    	    const whole = new Uint8Array(this.length);
+
+    	    let offset = 0;
+    	    this.buffers.forEach(part => {
+    	      whole.set(part, offset);
+    	      offset += part.length;
+    	    });
+
+    	    return Buffer$1.from(whole)
+    	  }
+
+    	  writeReverse (buf) {
+    	    assert(isBuffer$2(buf));
+    	    this.write(Buffer$1.from(buf).reverse());
+    	    return this
+    	  }
+
+    	  writeUInt16LE (n) {
+    	    writeU16LE(this, n);
+    	    return this
+    	  }
+
+    	  writeUInt16BE (n) {
     	    var bw = new BufferWriter();
-    	    bw.writeUInt8(255);
-    	    bw.writeUInt64LEBN(bn);
-    	    buf = bw.concat();
+    	    bw.writeUInt16LE(n);
+    	    this.writeReverse(bw.toBuffer());
+    	    return this
     	  }
-    	  return buf
-    	};
+
+    	  writeUInt32LE (n) {
+    	    writeU32LE(this, n);
+    	    return this
+    	  }
+
+    	  writeUInt32BE (n) {
+    	    var bw = new BufferWriter();
+    	    bw.writeUInt32LE(n);
+    	    this.writeReverse(bw.toBuffer());
+    	    return this
+    	  }
+
+    	  writeUInt8 (n) {
+    	    writeU8LE(this, n);
+    	    return this
+    	  }
+
+    	  writeUInt64LEBN (bn) {
+    	    var buf = bn.toBuffer({ size: 8 });
+    	    this.writeReverse(buf);
+    	    return this
+    	  }
+
+    	  writeUInt64BEBN (bn) {
+    	    var bw = new BufferWriter();
+    	    bw.writeUInt64LEBN(bn);
+    	    this.writeReverse(bw.toBuffer());
+    	    return this
+    	  }
+
+    	  writeVarintNum (n) {
+    	    writeVarint(this, n);
+    	    return this
+    	  }
+
+    	  writeInt32LE (n) {
+    	    writeI32LE(this, n);
+    	    return this
+    	  }
+
+    	  static varintBufNum (n) {
+    	    var bw = new BufferWriter();
+    	    bw.writeVarintNum(n);
+    	    return bw.toBuffer()
+    	  }
+
+    	  writeVarintBN (bn) {
+    	    var n = bn.toNumber();
+    	    if (n < 253) {
+    	      writeU8LE(this, n);
+    	    } else if (n < 0x10000) {
+    	      writeU8LE(this, 253);
+    	      writeU16LE(this, n);
+    	    } else if (n < 0x100000000) {
+    	      writeU8LE(this, 254);
+    	      writeU32LE(this, n);
+    	    } else {
+    	      var bw = new BufferWriter();
+    	      bw.writeUInt8(255);
+    	      bw.writeUInt64LEBN(bn);
+    	      var buf = bw.toBuffer();
+    	      this.write(buf);
+    	    }
+    	    return this
+    	  }
+    	}
 
     	bufferwriter = BufferWriter;
     	return bufferwriter;
@@ -64807,6 +64752,236 @@
     	return opcode;
     }
 
+    var decodeScriptChunks_1;
+    var hasRequiredDecodeScriptChunks;
+
+    function requireDecodeScriptChunks () {
+    	if (hasRequiredDecodeScriptChunks) return decodeScriptChunks_1;
+    	hasRequiredDecodeScriptChunks = 1;
+    	function decodeScriptChunks (script) {
+    	  const chunks = [];
+    	  let i = 0;
+    	  let len = 0;
+    	  while (i < script.length) {
+    	    const opcodenum = script[i];
+    	    i += 1;
+    	    if (opcodenum === 0) {
+    	      len = opcodenum;
+    	      chunks.push({ opcodenum: opcodenum, len });
+    	    } else if (opcodenum < 76) { // OP_PUSHDATA1
+    	      len = opcodenum;
+    	      chunks.push({ opcodenum: opcodenum, buf: script.slice(i, i + opcodenum), len });
+    	      i += opcodenum;
+    	    } else if (opcodenum === 76) { // OP_PUSHDATA1
+    	      len = script[i];
+    	      i += 1;
+    	      chunks.push({ opcodenum: opcodenum, buf: script.slice(i, i + len), len });
+    	      i += len;
+    	    } else if (opcodenum === 77) { // OP_PUSHDATA2
+    	      len = script[i] | script[i + 1] << 8;
+    	      i += 2;
+    	      chunks.push({ opcodenum: opcodenum, buf: script.slice(i, i + len), len });
+    	      i += len;
+    	    } else if (opcodenum === 78) { // OP_PUSHDATA4
+    	      len = script[i] + script[i + 1] * 0x0100 + script[i + 2] * 0x010000 + script[i + 3] * 0x01000000;
+    	      i += 4;
+    	      chunks.push({ opcodenum: opcodenum, buf: script.slice(i, i + len), len });
+    	      i += len;
+    	    } else {
+    	      chunks.push({ opcodenum: opcodenum });
+    	    }
+    	  }
+    	  // if (i !== script.length) throw new Error('bad script')
+    	  return chunks
+    	}
+
+    	decodeScriptChunks_1 = decodeScriptChunks;
+    	return decodeScriptChunks_1;
+    }
+
+    var isHex_1;
+    var hasRequiredIsHex;
+
+    function requireIsHex () {
+    	if (hasRequiredIsHex) return isHex_1;
+    	hasRequiredIsHex = 1;
+    	const HEX_REGEX = /^(?:[a-fA-F0-9][a-fA-F0-9])*$/;
+
+    	function isHex (s) {
+    	  return HEX_REGEX.test(s)
+    	}
+
+    	isHex_1 = isHex;
+    	return isHex_1;
+    }
+
+    var decodeHex_1;
+    var hasRequiredDecodeHex;
+
+    function requireDecodeHex () {
+    	if (hasRequiredDecodeHex) return decodeHex_1;
+    	hasRequiredDecodeHex = 1;
+    	const isHex = requireIsHex();
+
+    	// Prefer our implementation of decodeHex over Buffer when we don't know the VARIANT
+    	// to avoid accidentally importing the Buffer shim in the browser.
+
+    	function decodeHex (hex) {
+    	  if (typeof hex !== 'string') throw new Error('not a string')
+
+    	  if (hex.startsWith('0x')) hex = hex.slice(2);
+
+    	  if (hex.length % 2 === 1) hex = '0' + hex;
+
+    	  if (!isHex(hex)) throw new Error('invalid hex string in script')
+
+    	  if (typeof VARIANT === 'undefined' || VARIANT === 'browser') {
+    	    const length = hex.length / 2;
+    	    const arr = new Uint8Array(length);
+    	    const isNaN = x => x !== x; // eslint-disable-line no-self-compare
+    	    for (let i = 0; i < length; ++i) {
+    	      const byte = parseInt(hex.substr(i * 2, 2), 16);
+    	      if (isNaN(byte)) throw new Error('bad hex char')
+    	      arr[i] = byte;
+    	    }
+    	    return arr
+    	  } else {
+    	    return Buffer$1.from(hex, 'hex')
+    	  }
+    	}
+
+    	decodeHex_1 = decodeHex;
+    	return decodeHex_1;
+    }
+
+    var writePushData_1;
+    var hasRequiredWritePushData;
+
+    function requireWritePushData () {
+    	if (hasRequiredWritePushData) return writePushData_1;
+    	hasRequiredWritePushData = 1;
+    	function writePushData (writer, buffer) {
+    	  // It is possible to optimize buffers that only store numbers 1-16, or -1, by using the OP_N opcodes.
+    	  // But we say "push data" is always stored using OP_0 or OP_PUSH(N) so that it's easy to identify and
+    	  // extract, and also because there is some ambiguity around OP_0 if we don't do this.
+    	  if (buffer.length === 0) {
+    	    writer.write([0]);
+    	  } else if (buffer.length <= 75) {
+    	    writer.write([buffer.length]); // OP_PUSH(buffer.length)
+    	    writer.write(buffer);
+    	  } else if (buffer.length <= 0xFF) {
+    	    writer.write([76, buffer.length]); // OP_PUSHDATA1
+    	    writer.write(buffer);
+    	  } else if (buffer.length <= 0xFFFF) {
+    	    writer.write([77, buffer.length % 256, buffer.length >> 8]); // OP_PUSHDATA2
+    	    writer.write(buffer);
+    	  } else if (buffer.length <= 0xFFFFFFFF) {
+    	    const prefix = new Uint8Array(5);
+    	    prefix[0] = 78; // OP_PUSHDATA4
+    	    let n = buffer.length;
+    	    prefix[1] = n % 256;
+    	    n = Math.floor(n / 256);
+    	    prefix[2] = n % 256;
+    	    n = Math.floor(n / 256);
+    	    prefix[3] = n % 256;
+    	    n = Math.floor(n / 256);
+    	    prefix[4] = n;
+    	    writer.write(prefix);
+    	    writer.write(buffer);
+    	  } else {
+    	    throw new Error('data too large')
+    	  }
+    	  return writer
+    	}
+
+    	writePushData_1 = writePushData;
+    	return writePushData_1;
+    }
+
+    var decodeAsm;
+    var hasRequiredDecodeAsm;
+
+    function requireDecodeAsm () {
+    	if (hasRequiredDecodeAsm) return decodeAsm;
+    	hasRequiredDecodeAsm = 1;
+    	const decodeHex = requireDecodeHex();
+    	const opcodes = requireOpcode();
+    	const BufferWriter = requireBufferwriter();
+    	const writePushData = requireWritePushData();
+
+    	function decodeASM (script) {
+    	  const parts = script.split(' ');
+    	  const writer = new BufferWriter();
+    	  parts.forEach(part => {
+    	    if (part in opcodes) {
+    	      writer.write([opcodes[part]]);
+    	    } else if (part === '0') {
+    	      writer.write([opcodes.OP_0]);
+    	    } else if (part === '-1') {
+    	      writer.write([opcodes.OP_1NEGATE]);
+    	    } else {
+    	      const buf = decodeHex(part);
+    	      writePushData(writer, buf);
+    	    }
+    	  });
+    	  return writer.toBuffer()
+    	}
+
+    	decodeAsm = decodeASM;
+    	return decodeAsm;
+    }
+
+    var encodeHex_1;
+    var hasRequiredEncodeHex;
+
+    function requireEncodeHex () {
+    	if (hasRequiredEncodeHex) return encodeHex_1;
+    	hasRequiredEncodeHex = 1;
+    	let encodeHex = null;
+
+    	// Prefer our implementation of encodeHex over Buffer when we don't know the VARIANT
+    	// to avoid accidentally importing the Buffer shim in the browser.
+
+    	if (typeof VARIANT === 'undefined' || VARIANT === 'browser') {
+    	  // In the browser, a lookup table is fastest, and faster than the Buffer toString shim.
+    	  const HEX = [
+    	    '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '0a', '0b', '0c', '0d', '0e', '0f',
+    	    '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '1a', '1b', '1c', '1d', '1e', '1f',
+    	    '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '2a', '2b', '2c', '2d', '2e', '2f',
+    	    '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '3a', '3b', '3c', '3d', '3e', '3f',
+    	    '40', '41', '42', '43', '44', '45', '46', '47', '48', '49', '4a', '4b', '4c', '4d', '4e', '4f',
+    	    '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '5a', '5b', '5c', '5d', '5e', '5f',
+    	    '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '6a', '6b', '6c', '6d', '6e', '6f',
+    	    '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '7a', '7b', '7c', '7d', '7e', '7f',
+    	    '80', '81', '82', '83', '84', '85', '86', '87', '88', '89', '8a', '8b', '8c', '8d', '8e', '8f',
+    	    '90', '91', '92', '93', '94', '95', '96', '97', '98', '99', '9a', '9b', '9c', '9d', '9e', '9f',
+    	    'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'aa', 'ab', 'ac', 'ad', 'ae', 'af',
+    	    'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'ba', 'bb', 'bc', 'bd', 'be', 'bf',
+    	    'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'ca', 'cb', 'cc', 'cd', 'ce', 'cf',
+    	    'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'da', 'db', 'dc', 'dd', 'de', 'df',
+    	    'e0', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'ea', 'eb', 'ec', 'ed', 'ee', 'ef',
+    	    'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'fa', 'fb', 'fc', 'fd', 'fe', 'ff'
+    	  ];
+
+    	  encodeHex = function (buffer) {
+    	    const len = buffer.length;
+    	    const out = new Array(len);
+    	    for (let i = 0; i < len; ++i) {
+    	      out[i] = HEX[buffer[i]];
+    	    }
+    	    return out.join('')
+    	  };
+    	} else {
+    	  // Buffer toString('hex') in Node is faster than any JavaScript we could write
+    	  encodeHex = function (buffer) {
+    	    return buffer instanceof Buffer$1 ? buffer.toString('hex') : Buffer$1.from(buffer).toString('hex')
+    	  };
+    	}
+
+    	encodeHex_1 = encodeHex;
+    	return encodeHex_1;
+    }
+
     var script;
     var hasRequiredScript$1;
 
@@ -64815,7 +64990,6 @@
     	hasRequiredScript$1 = 1;
 
     	var Address = requireAddress();
-    	var BufferReader = requireBufferreader();
     	var BufferWriter = requireBufferwriter();
     	var Hash = requireHash();
     	var Opcode = requireOpcode();
@@ -64827,6 +65001,12 @@
     	var errors = requireErrors();
     	var buffer = require$$1;
     	var JSUtil = requireJs();
+    	const decodeScriptChunks = requireDecodeScriptChunks();
+    	const decodeASM = requireDecodeAsm();
+    	const encodeHex = requireEncodeHex();
+
+    	// These WeakMap caches allow the objects themselves to maintain their immutability
+    	const SCRIPT_TO_CHUNKS_CACHE = new WeakMap();
 
     	/**
     	 * A bitcoin transaction script. Each transaction's inputs and outputs
@@ -64837,11 +65017,11 @@
     	 * @constructor
     	 * @param {Object|string|Buffer=} from optional data to populate script
     	 */
-    	var Script = function Script(from) {
+    	var Script = function Script (from) {
     	  if (!(this instanceof Script)) {
     	    return new Script(from)
     	  }
-    	  this.chunks = [];
+    	  this.buffer = Buffer$1.from([]);
 
     	  if (isBuffer$2(from)) {
     	    return Script.fromBuffer(from)
@@ -64852,154 +65032,66 @@
     	  } else if (_.isString(from)) {
     	    return Script.fromString(from)
     	  } else if (_.isObject(from) && _.isArray(from.chunks)) {
-    	    this.set(from);
+    	    return Script.fromChunks(from.chunks)
+    	  } else if (_.isObject(from) && isBuffer$2(from.buffer)) {
+    	    return Script.fromBuffer(from.buffer)
     	  }
     	};
 
     	Script.prototype.set = function (obj) {
     	  $.checkArgument(_.isObject(obj));
-    	  $.checkArgument(_.isArray(obj.chunks));
-    	  this.chunks = obj.chunks;
+    	  if (obj.chunks && _.isArray(obj.chunks)) {
+    	    var s = Script.fromChunks(obj.chunks);
+    	    this.buffer = s.buffer;
+    	    return this
+    	  }
+
+    	  $.checkArgument(isBuffer$2(obj.buffer));
+    	  this.buffer = obj.buffer;
     	  return this
     	};
 
     	Script.fromBuffer = function (buffer) {
+    	  $.checkArgument(isBuffer$2(buffer));
     	  var script = new Script();
-    	  script.chunks = [];
-
-    	  var br = new BufferReader(buffer);
-    	  while (!br.finished()) {
-    	    try {
-    	      var opcodenum = br.readUInt8();
-
-    	      var len, buf;
-    	      if (opcodenum > 0 && opcodenum < Opcode.OP_PUSHDATA1) {
-    	        len = opcodenum;
-    	        script.chunks.push({
-    	          buf: br.read(len),
-    	          len: len,
-    	          opcodenum: opcodenum
-    	        });
-    	      } else if (opcodenum === Opcode.OP_PUSHDATA1) {
-    	        len = br.readUInt8();
-    	        buf = br.read(len);
-    	        script.chunks.push({
-    	          buf: buf,
-    	          len: len,
-    	          opcodenum: opcodenum
-    	        });
-    	      } else if (opcodenum === Opcode.OP_PUSHDATA2) {
-    	        len = br.readUInt16LE();
-    	        buf = br.read(len);
-    	        script.chunks.push({
-    	          buf: buf,
-    	          len: len,
-    	          opcodenum: opcodenum
-    	        });
-    	      } else if (opcodenum === Opcode.OP_PUSHDATA4) {
-    	        len = br.readUInt32LE();
-    	        buf = br.read(len);
-    	        script.chunks.push({
-    	          buf: buf,
-    	          len: len,
-    	          opcodenum: opcodenum
-    	        });
-    	      } else {
-    	        script.chunks.push({
-    	          opcodenum: opcodenum
-    	        });
-    	      }
-    	    } catch (e) {
-    	      if (e instanceof RangeError) {
-    	        throw new errors.Script.InvalidBuffer(buffer.toString('hex'))
-    	      }
-    	      throw e
-    	    }
-    	  }
-
+    	  script.buffer = buffer;
     	  return script
     	};
 
-    	Script.prototype.toBuffer = function () {
-    	  var bw = new BufferWriter();
+    	Script.fromChunks = function (chunks) {
+    	  var script = new Script();
 
-    	  for (var i = 0; i < this.chunks.length; i++) {
-    	    var chunk = this.chunks[i];
-    	    var opcodenum = chunk.opcodenum;
+    	  const bw = new BufferWriter();
+
+    	  for (let index = 0; index < chunks.length; index++) {
+    	    const chunk = chunks[index];
     	    bw.writeUInt8(chunk.opcodenum);
     	    if (chunk.buf) {
-    	      if (opcodenum < Opcode.OP_PUSHDATA1) {
+    	      if (chunk.opcodenum < Opcode.OP_PUSHDATA1) {
     	        bw.write(chunk.buf);
-    	      } else if (opcodenum === Opcode.OP_PUSHDATA1) {
+    	      } else if (chunk.opcodenum === Opcode.OP_PUSHDATA1) {
     	        bw.writeUInt8(chunk.len);
     	        bw.write(chunk.buf);
-    	      } else if (opcodenum === Opcode.OP_PUSHDATA2) {
+    	      } else if (chunk.opcodenum === Opcode.OP_PUSHDATA2) {
     	        bw.writeUInt16LE(chunk.len);
     	        bw.write(chunk.buf);
-    	      } else if (opcodenum === Opcode.OP_PUSHDATA4) {
+    	      } else if (chunk.opcodenum === Opcode.OP_PUSHDATA4) {
     	        bw.writeUInt32LE(chunk.len);
     	        bw.write(chunk.buf);
     	      }
     	    }
     	  }
 
-    	  return bw.concat()
+    	  script.buffer = bw.toBuffer();
+    	  return script
+    	};
+
+    	Script.prototype.toBuffer = function () {
+    	  return this.buffer
     	};
 
     	Script.fromASM = function (str) {
-    	  var script = new Script();
-    	  script.chunks = [];
-
-    	  var tokens = str.split(' ');
-    	  var i = 0;
-    	  while (i < tokens.length) {
-    	    var token = tokens[i];
-    	    var opcode = Opcode(token);
-    	    var opcodenum = opcode.toNumber();
-
-    	    // we start with two special cases, 0 and -1, which are handled specially in
-    	    // toASM. see _chunkToString.
-    	    if (token === '0') {
-    	      opcodenum = 0;
-    	      script.chunks.push({
-    	        opcodenum: opcodenum
-    	      });
-    	      i = i + 1;
-    	    } else if (token === '-1') {
-    	      opcodenum = Opcode.OP_1NEGATE;
-    	      script.chunks.push({
-    	        opcodenum: opcodenum
-    	      });
-    	      i = i + 1;
-    	    } else if (_.isUndefined(opcodenum)) {
-    	      var buf = Buffer$1.from(tokens[i], 'hex');
-    	      if (buf.toString('hex') !== tokens[i]) {
-    	        throw new Error('invalid hex string in script')
-    	      }
-    	      var len = buf.length;
-    	      if (len >= 0 && len < Opcode.OP_PUSHDATA1) {
-    	        opcodenum = len;
-    	      } else if (len < Math.pow(2, 8)) {
-    	        opcodenum = Opcode.OP_PUSHDATA1;
-    	      } else if (len < Math.pow(2, 16)) {
-    	        opcodenum = Opcode.OP_PUSHDATA2;
-    	      } else if (len < Math.pow(2, 32)) {
-    	        opcodenum = Opcode.OP_PUSHDATA4;
-    	      }
-    	      script.chunks.push({
-    	        buf: buf,
-    	        len: buf.length,
-    	        opcodenum: opcodenum
-    	      });
-    	      i = i + 1;
-    	    } else {
-    	      script.chunks.push({
-    	        opcodenum: opcodenum
-    	      });
-    	      i = i + 1;
-    	    }
-    	  }
-    	  return script
+    	  return Script.fromBuffer(decodeASM(str))
     	};
 
     	Script.fromHex = function (str) {
@@ -65010,8 +65102,8 @@
     	  if (JSUtil.isHexa(str) || str.length === 0) {
     	    return new Script(buffer.Buffer.from(str, 'hex'))
     	  }
-    	  var script = new Script();
-    	  script.chunks = [];
+
+    	  var chunks = [];
 
     	  var tokens = str.split(' ');
     	  var i = 0;
@@ -65023,7 +65115,11 @@
     	    if (_.isUndefined(opcodenum)) {
     	      opcodenum = parseInt(token);
     	      if (opcodenum > 0 && opcodenum < Opcode.OP_PUSHDATA1) {
-    	        script.chunks.push({
+    	        var buf = Buffer$1.from(tokens[i + 1].slice(2), 'hex');
+    	        if (buf.length !== opcodenum) {
+    	          throw new Error('Invalid script buf len: ' + JSON.stringify(str))
+    	        }
+    	        chunks.push({
     	          buf: Buffer$1.from(tokens[i + 1].slice(2), 'hex'),
     	          len: opcodenum,
     	          opcodenum: opcodenum
@@ -65038,21 +65134,40 @@
     	      if (tokens[i + 2].slice(0, 2) !== '0x') {
     	        throw new Error('Pushdata data must start with 0x')
     	      }
-    	      script.chunks.push({
+    	      chunks.push({
     	        buf: Buffer$1.from(tokens[i + 2].slice(2), 'hex'),
     	        len: parseInt(tokens[i + 1]),
     	        opcodenum: opcodenum
     	      });
     	      i = i + 3;
     	    } else {
-    	      script.chunks.push({
+    	      chunks.push({
     	        opcodenum: opcodenum
     	      });
     	      i = i + 1;
     	    }
     	  }
-    	  return script
+    	  return Script.fromChunks(chunks)
     	};
+
+    	Script.prototype.slice = function (start, end) {
+    	  return this.buffer.slice(start, end)
+    	};
+
+    	Object.defineProperty(Script.prototype, 'chunks', {
+    	  get () {
+    	    if (SCRIPT_TO_CHUNKS_CACHE.has(this)) return SCRIPT_TO_CHUNKS_CACHE.get(this)
+    	    const chunks = decodeScriptChunks(this.buffer);
+    	    SCRIPT_TO_CHUNKS_CACHE.set(this, chunks);
+    	    return chunks
+    	  }
+    	});
+
+    	Object.defineProperty(Script.prototype, 'length', {
+    	  get () {
+    	    return this.buffer.length
+    	  }
+    	});
 
     	Script.prototype._chunkToString = function (chunk, type) {
     	  var opcodenum = chunk.opcodenum;
@@ -65107,7 +65222,8 @@
 
     	Script.prototype.toASM = function () {
     	  var str = '';
-    	  for (var i = 0; i < this.chunks.length; i++) {
+    	  var chunks = this.chunks;
+    	  for (var i = 0; i < chunks.length; i++) {
     	    var chunk = this.chunks[i];
     	    str += this._chunkToString(chunk, 'asm');
     	  }
@@ -65126,7 +65242,7 @@
     	};
 
     	Script.prototype.toHex = function () {
-    	  return this.toBuffer().toString('hex')
+    	  return encodeHex(this.buffer)
     	};
 
     	Script.prototype.inspect = function () {
@@ -65292,23 +65408,23 @@
     	 * @returns {boolean} true if this is a valid standard OP_RETURN output
     	 */
     	Script.prototype.isDataOut = function () {
-    	  var step1 = this.chunks.length >= 1 &&
-    	    this.chunks[0].opcodenum === Opcode.OP_RETURN;
+    	  var step1 = this.buffer.length >= 1 &&
+    	    this.buffer[0] === Opcode.OP_RETURN;
     	  if (!step1) return false
-    	  var chunks = this.chunks.slice(1);
-    	  var script2 = new Script({ chunks: chunks });
+    	  var buffer = this.buffer.slice(1);
+    	  var script2 = new Script({ buffer: buffer });
     	  return script2.isPushOnly()
     	};
 
     	Script.prototype.isSafeDataOut = function () {
-    	  if (this.chunks.length < 2) {
+    	  if (this.buffer.length < 2) {
     	    return false
     	  }
-    	  if (this.chunks[0].opcodenum !== Opcode.OP_FALSE) {
+    	  if (this.buffer[0] !== Opcode.OP_FALSE) {
     	    return false
     	  }
-    	  var chunks = this.chunks.slice(1);
-    	  var script2 = new Script({ chunks });
+    	  var buffer = this.buffer.slice(1);
+    	  var script2 = new Script({ buffer });
     	  return script2.isDataOut()
     	};
 
@@ -65446,17 +65562,12 @@
     	 */
     	Script.prototype.equals = function (script) {
     	  $.checkState(script instanceof Script, 'Must provide another script');
-    	  if (this.chunks.length !== script.chunks.length) {
+    	  if (this.buffer.length !== script.buffer.length) {
     	    return false
     	  }
     	  var i;
-    	  for (i = 0; i < this.chunks.length; i++) {
-    	    if (isBuffer$2(this.chunks[i].buf) && !isBuffer$2(script.chunks[i].buf)) {
-    	      return false
-    	    }
-    	    if (isBuffer$2(this.chunks[i].buf) && !this.chunks[i].buf.equals(script.chunks[i].buf)) {
-    	      return false
-    	    } else if (this.chunks[i].opcodenum !== script.chunks[i].opcodenum) {
+    	  for (i = 0; i < this.buffer.length; i++) {
+    	    if (this.buffer[i] !== script.buffer[i]) {
     	      return false
     	    }
     	  }
@@ -65485,20 +65596,26 @@
     	  } else if (isBuffer$2(obj)) {
     	    this._addBuffer(obj, prepend);
     	  } else if (obj instanceof Script) {
-    	    this.chunks = this.chunks.concat(obj.chunks);
+    	    this._insertAtPosition(obj.buffer, prepend);
     	  } else if (typeof obj === 'object') {
-    	    this._insertAtPosition(obj, prepend);
+    	    var s = Script.fromChunks([obj]);
+    	    this._insertAtPosition(s.toBuffer(), prepend);
     	  } else {
     	    throw new Error('Invalid script chunk')
     	  }
     	};
 
-    	Script.prototype._insertAtPosition = function (op, prepend) {
+    	Script.prototype._insertAtPosition = function (buf, prepend) {
+    	  var bw = new BufferWriter();
+
     	  if (prepend) {
-    	    this.chunks.unshift(op);
+    	    bw.write(buf);
+    	    bw.write(this.buffer);
     	  } else {
-    	    this.chunks.push(op);
+    	    bw.write(this.buffer);
+    	    bw.write(buf);
     	  }
+    	  this.buffer = bw.toBuffer();
     	};
 
     	Script.prototype._addOpcode = function (opcode, prepend) {
@@ -65510,32 +65627,53 @@
     	  } else {
     	    op = Opcode(opcode).toNumber();
     	  }
-    	  this._insertAtPosition({
+
+    	  // OP_INVALIDOPCODE
+    	  if (op > 255) {
+    	    throw new errors.Script.InvalidOpcode(op)
+    	  }
+    	  this._insertAtPosition(Script.fromChunks([{
     	    opcodenum: op
-    	  }, prepend);
+    	  }]).toBuffer(), prepend);
     	  return this
     	};
 
     	Script.prototype._addBuffer = function (buf, prepend) {
+    	  var bw = new BufferWriter();
     	  var opcodenum;
     	  var len = buf.length;
-    	  if (len >= 0 && len < Opcode.OP_PUSHDATA1) {
+    	  if (len === 0) {
+    	    opcodenum = 0;
+    	    bw.writeUInt8(opcodenum);
+    	  } else if (len > 0 && len < Opcode.OP_PUSHDATA1) {
     	    opcodenum = len;
+    	    bw.writeUInt8(opcodenum);
+    	    bw.write(buf);
     	  } else if (len < Math.pow(2, 8)) {
     	    opcodenum = Opcode.OP_PUSHDATA1;
+    	    bw.writeUInt8(opcodenum);
+    	    bw.writeUInt8(len);
+    	    bw.write(buf);
     	  } else if (len < Math.pow(2, 16)) {
     	    opcodenum = Opcode.OP_PUSHDATA2;
+    	    bw.writeUInt8(opcodenum);
+    	    bw.writeUInt16LE(len);
+    	    bw.write(buf);
     	  } else if (len < Math.pow(2, 32)) {
     	    opcodenum = Opcode.OP_PUSHDATA4;
+    	    bw.writeUInt8(opcodenum);
+    	    bw.writeUInt32LE(len);
+    	    bw.write(buf);
     	  } else {
     	    throw new Error('You can\'t push that much data')
     	  }
-    	  this._insertAtPosition({
-    	    buf: buf,
-    	    len: len,
-    	    opcodenum: opcodenum
-    	  }, prepend);
+
+    	  this._insertAtPosition(bw.toBuffer(), prepend);
     	  return this
+    	};
+
+    	Script.prototype.clone = function () {
+    	  return Script.fromBuffer(this.buffer.slice())
     	};
 
     	Script.prototype.removeCodeseparators = function () {
@@ -65545,10 +65683,11 @@
     	      chunks.push(this.chunks[i]);
     	    }
     	  }
-    	  this.chunks = chunks;
+    	  SCRIPT_TO_CHUNKS_CACHE.delete(this);
+
+    	  this.buffer = Script.fromChunks(chunks).toBuffer();
     	  return this
     	};
-
 
     	/**
     	 * If the script does not contain any OP_CODESEPARATOR, Return all scripts
@@ -65557,27 +65696,21 @@
     	 *
     	 * @returns {Script} Subset of script starting at the {n}th codeseparator
     	 */
-    	 Script.prototype.subScript = function (n) {
-
+    	Script.prototype.subScript = function (n) {
     	  var idx = 0;
 
     	  for (var i = 0; i < this.chunks.length; i++) {
     	    if (this.chunks[i].opcodenum === Opcode.OP_CODESEPARATOR) {
     	      if (idx === n) {
-    	        return new Script().set({
-    	          chunks: this.chunks.slice(i + 1)
-    	        })
+    	        return Script.fromChunks(this.chunks.slice(i + 1))
     	      } else {
     	        idx++;
     	      }
     	    }
     	  }
 
-    	  return new Script().set({
-    	    chunks: this.chunks.slice(0)
-    	  })
+    	  return this
     	};
-
 
     	// high level script builder methods
 
@@ -65906,14 +66039,14 @@
     	Script.prototype.findAndDelete = function (script) {
     	  var buf = script.toBuffer();
     	  var hex = buf.toString('hex');
-    	  for (var i = 0; i < this.chunks.length; i++) {
-    	    var script2 = Script({
-    	      chunks: [this.chunks[i]]
-    	    });
+    	  var chunks = this.chunks;
+    	  for (var i = 0; i < chunks.length; i++) {
+    	    var script2 = Script.fromChunks([chunks[i]]);
     	    var buf2 = script2.toBuffer();
     	    var hex2 = buf2.toString('hex');
     	    if (hex === hex2) {
-    	      this.chunks.splice(i, 1);
+    	      chunks.splice(i, 1);
+    	      this.buffer = Script.fromChunks(chunks).toBuffer();
     	    }
     	  }
     	  return this
@@ -65977,7 +66110,7 @@
     	  var self = this;
     	  var n = 0;
     	  var lastOpcode = Opcode.OP_INVALIDOPCODE;
-    	  _.each(self.chunks, function getChunk(chunk) {
+    	  _.each(self.chunks, function getChunk (chunk) {
     	    var opcode = chunk.opcodenum;
     	    if (opcode === Opcode.OP_CHECKSIG || opcode === Opcode.OP_CHECKSIGVERIFY) {
     	      n++;
@@ -65995,350 +66128,6 @@
 
     	script = Script;
     	return script;
-    }
-
-    var kindOf$1;
-    var hasRequiredKindOf;
-
-    function requireKindOf () {
-    	if (hasRequiredKindOf) return kindOf$1;
-    	hasRequiredKindOf = 1;
-    	var toString = Object.prototype.toString;
-
-    	kindOf$1 = function kindOf(val) {
-    	  if (val === void 0) return 'undefined';
-    	  if (val === null) return 'null';
-
-    	  var type = typeof val;
-    	  if (type === 'boolean') return 'boolean';
-    	  if (type === 'string') return 'string';
-    	  if (type === 'number') return 'number';
-    	  if (type === 'symbol') return 'symbol';
-    	  if (type === 'function') {
-    	    return isGeneratorFn(val) ? 'generatorfunction' : 'function';
-    	  }
-
-    	  if (isArray(val)) return 'array';
-    	  if (isBuffer(val)) return 'buffer';
-    	  if (isArguments(val)) return 'arguments';
-    	  if (isDate(val)) return 'date';
-    	  if (isError(val)) return 'error';
-    	  if (isRegexp(val)) return 'regexp';
-
-    	  switch (ctorName(val)) {
-    	    case 'Symbol': return 'symbol';
-    	    case 'Promise': return 'promise';
-
-    	    // Set, Map, WeakSet, WeakMap
-    	    case 'WeakMap': return 'weakmap';
-    	    case 'WeakSet': return 'weakset';
-    	    case 'Map': return 'map';
-    	    case 'Set': return 'set';
-
-    	    // 8-bit typed arrays
-    	    case 'Int8Array': return 'int8array';
-    	    case 'Uint8Array': return 'uint8array';
-    	    case 'Uint8ClampedArray': return 'uint8clampedarray';
-
-    	    // 16-bit typed arrays
-    	    case 'Int16Array': return 'int16array';
-    	    case 'Uint16Array': return 'uint16array';
-
-    	    // 32-bit typed arrays
-    	    case 'Int32Array': return 'int32array';
-    	    case 'Uint32Array': return 'uint32array';
-    	    case 'Float32Array': return 'float32array';
-    	    case 'Float64Array': return 'float64array';
-    	  }
-
-    	  if (isGeneratorObj(val)) {
-    	    return 'generator';
-    	  }
-
-    	  // Non-plain objects
-    	  type = toString.call(val);
-    	  switch (type) {
-    	    case '[object Object]': return 'object';
-    	    // iterators
-    	    case '[object Map Iterator]': return 'mapiterator';
-    	    case '[object Set Iterator]': return 'setiterator';
-    	    case '[object String Iterator]': return 'stringiterator';
-    	    case '[object Array Iterator]': return 'arrayiterator';
-    	  }
-
-    	  // other
-    	  return type.slice(8, -1).toLowerCase().replace(/\s/g, '');
-    	};
-
-    	function ctorName(val) {
-    	  return typeof val.constructor === 'function' ? val.constructor.name : null;
-    	}
-
-    	function isArray(val) {
-    	  if (Array.isArray) return Array.isArray(val);
-    	  return val instanceof Array;
-    	}
-
-    	function isError(val) {
-    	  return val instanceof Error || (typeof val.message === 'string' && val.constructor && typeof val.constructor.stackTraceLimit === 'number');
-    	}
-
-    	function isDate(val) {
-    	  if (val instanceof Date) return true;
-    	  return typeof val.toDateString === 'function'
-    	    && typeof val.getDate === 'function'
-    	    && typeof val.setDate === 'function';
-    	}
-
-    	function isRegexp(val) {
-    	  if (val instanceof RegExp) return true;
-    	  return typeof val.flags === 'string'
-    	    && typeof val.ignoreCase === 'boolean'
-    	    && typeof val.multiline === 'boolean'
-    	    && typeof val.global === 'boolean';
-    	}
-
-    	function isGeneratorFn(name, val) {
-    	  return ctorName(name) === 'GeneratorFunction';
-    	}
-
-    	function isGeneratorObj(val) {
-    	  return typeof val.throw === 'function'
-    	    && typeof val.return === 'function'
-    	    && typeof val.next === 'function';
-    	}
-
-    	function isArguments(val) {
-    	  try {
-    	    if (typeof val.length === 'number' && typeof val.callee === 'function') {
-    	      return true;
-    	    }
-    	  } catch (err) {
-    	    if (err.message.indexOf('callee') !== -1) {
-    	      return true;
-    	    }
-    	  }
-    	  return false;
-    	}
-
-    	/**
-    	 * If you need to support Safari 5-7 (8-10 yr-old browser),
-    	 * take a look at https://github.com/feross/is-buffer
-    	 */
-
-    	function isBuffer(val) {
-    	  if (val.constructor && typeof val.constructor.isBuffer === 'function') {
-    	    return val.constructor.isBuffer(val);
-    	  }
-    	  return false;
-    	}
-    	return kindOf$1;
-    }
-
-    var shallowClone;
-    var hasRequiredShallowClone;
-
-    function requireShallowClone () {
-    	if (hasRequiredShallowClone) return shallowClone;
-    	hasRequiredShallowClone = 1;
-
-    	const valueOf = Symbol.prototype.valueOf;
-    	const typeOf = requireKindOf();
-
-    	function clone(val, deep) {
-    	  switch (typeOf(val)) {
-    	    case 'array':
-    	      return val.slice();
-    	    case 'object':
-    	      return Object.assign({}, val);
-    	    case 'date':
-    	      return new val.constructor(Number(val));
-    	    case 'map':
-    	      return new Map(val);
-    	    case 'set':
-    	      return new Set(val);
-    	    case 'buffer':
-    	      return cloneBuffer(val);
-    	    case 'symbol':
-    	      return cloneSymbol(val);
-    	    case 'arraybuffer':
-    	      return cloneArrayBuffer(val);
-    	    case 'float32array':
-    	    case 'float64array':
-    	    case 'int16array':
-    	    case 'int32array':
-    	    case 'int8array':
-    	    case 'uint16array':
-    	    case 'uint32array':
-    	    case 'uint8clampedarray':
-    	    case 'uint8array':
-    	      return cloneTypedArray(val);
-    	    case 'regexp':
-    	      return cloneRegExp(val);
-    	    case 'error':
-    	      return Object.create(val);
-    	    default: {
-    	      return val;
-    	    }
-    	  }
-    	}
-
-    	function cloneRegExp(val) {
-    	  const flags = val.flags !== void 0 ? val.flags : (/\w+$/.exec(val) || void 0);
-    	  const re = new val.constructor(val.source, flags);
-    	  re.lastIndex = val.lastIndex;
-    	  return re;
-    	}
-
-    	function cloneArrayBuffer(val) {
-    	  const res = new val.constructor(val.byteLength);
-    	  new Uint8Array(res).set(new Uint8Array(val));
-    	  return res;
-    	}
-
-    	function cloneTypedArray(val, deep) {
-    	  return new val.constructor(val.buffer, val.byteOffset, val.length);
-    	}
-
-    	function cloneBuffer(val) {
-    	  const len = val.length;
-    	  const buf = Buffer$1.allocUnsafe ? Buffer$1.allocUnsafe(len) : Buffer$1.from(len);
-    	  val.copy(buf);
-    	  return buf;
-    	}
-
-    	function cloneSymbol(val) {
-    	  return valueOf ? Object(valueOf.call(val)) : {};
-    	}
-
-    	/**
-    	 * Expose `clone`
-    	 */
-
-    	shallowClone = clone;
-    	return shallowClone;
-    }
-
-    /*!
-     * isobject <https://github.com/jonschlinkert/isobject>
-     *
-     * Copyright (c) 2014-2017, Jon Schlinkert.
-     * Released under the MIT License.
-     */
-
-    var isobject;
-    var hasRequiredIsobject;
-
-    function requireIsobject () {
-    	if (hasRequiredIsobject) return isobject;
-    	hasRequiredIsobject = 1;
-
-    	isobject = function isObject(val) {
-    	  return val != null && typeof val === 'object' && Array.isArray(val) === false;
-    	};
-    	return isobject;
-    }
-
-    /*!
-     * is-plain-object <https://github.com/jonschlinkert/is-plain-object>
-     *
-     * Copyright (c) 2014-2017, Jon Schlinkert.
-     * Released under the MIT License.
-     */
-
-    var isPlainObject$1;
-    var hasRequiredIsPlainObject;
-
-    function requireIsPlainObject () {
-    	if (hasRequiredIsPlainObject) return isPlainObject$1;
-    	hasRequiredIsPlainObject = 1;
-
-    	var isObject = requireIsobject();
-
-    	function isObjectObject(o) {
-    	  return isObject(o) === true
-    	    && Object.prototype.toString.call(o) === '[object Object]';
-    	}
-
-    	isPlainObject$1 = function isPlainObject(o) {
-    	  var ctor,prot;
-
-    	  if (isObjectObject(o) === false) return false;
-
-    	  // If has modified constructor
-    	  ctor = o.constructor;
-    	  if (typeof ctor !== 'function') return false;
-
-    	  // If has modified prototype
-    	  prot = ctor.prototype;
-    	  if (isObjectObject(prot) === false) return false;
-
-    	  // If constructor does not have an Object-specific method
-    	  if (prot.hasOwnProperty('isPrototypeOf') === false) {
-    	    return false;
-    	  }
-
-    	  // Most likely a plain Object
-    	  return true;
-    	};
-    	return isPlainObject$1;
-    }
-
-    var cloneDeep_1;
-    var hasRequiredCloneDeep;
-
-    function requireCloneDeep () {
-    	if (hasRequiredCloneDeep) return cloneDeep_1;
-    	hasRequiredCloneDeep = 1;
-
-    	/**
-    	 * Module dependenices
-    	 */
-
-    	const clone = requireShallowClone();
-    	const typeOf = requireKindOf();
-    	const isPlainObject = requireIsPlainObject();
-
-    	function cloneDeep(val, instanceClone) {
-    	  switch (typeOf(val)) {
-    	    case 'object':
-    	      return cloneObjectDeep(val, instanceClone);
-    	    case 'array':
-    	      return cloneArrayDeep(val, instanceClone);
-    	    default: {
-    	      return clone(val);
-    	    }
-    	  }
-    	}
-
-    	function cloneObjectDeep(val, instanceClone) {
-    	  if (typeof instanceClone === 'function') {
-    	    return instanceClone(val);
-    	  }
-    	  if (instanceClone || isPlainObject(val)) {
-    	    const res = new val.constructor();
-    	    for (let key in val) {
-    	      res[key] = cloneDeep(val[key], instanceClone);
-    	    }
-    	    return res;
-    	  }
-    	  return val;
-    	}
-
-    	function cloneArrayDeep(val, instanceClone) {
-    	  const res = new val.constructor(val.length);
-    	  for (let i = 0; i < val.length; i++) {
-    	    res[i] = cloneDeep(val[i], instanceClone);
-    	  }
-    	  return res;
-    	}
-
-    	/**
-    	 * Expose `cloneDeep`
-    	 */
-
-    	cloneDeep_1 = cloneDeep;
-    	return cloneDeep_1;
     }
 
     var stack;
@@ -66409,14 +66198,15 @@
     	  return new Stack(this.stack.slice() || [], this.varStack.slice() || [])
     	};
 
-
-    	function bytesToHexString(bytearray ) {
-    	  return bytearray.reduce(function (o, c) { return o += ('0' + (c & 0xFF).toString(16)).slice(-2); }, '');
+    	function bytesToHexString (bytearray) {
+    	  return bytearray.reduce(function (o, c) {
+    	    o += ('0' + (c & 0xFF).toString(16)).slice(-2);
+    	    return o
+    	  }, '')
     	}
 
     	Stack.prototype.printVarStack = function () {
-
-    	  let array = this.varStack.map((v,i) => ({
+    	  let array = this.varStack.map((v, i) => ({
     	    name: v,
     	    value: bytesToHexString(this.rawstack[i].data)
     	  }));
@@ -66452,6 +66242,214 @@
     }
 
     var transaction$1 = {exports: {}};
+
+    var bufferreader;
+    var hasRequiredBufferreader;
+
+    function requireBufferreader () {
+    	if (hasRequiredBufferreader) return bufferreader;
+    	hasRequiredBufferreader = 1;
+
+    	var _ = require_();
+    	var $ = requirePreconditions();
+    	var BN = requireBn$1();
+
+    	var BufferReader = function BufferReader (buf) {
+    	  if (!(this instanceof BufferReader)) {
+    	    return new BufferReader(buf)
+    	  }
+    	  if (_.isUndefined(buf)) {
+    	    return
+    	  }
+    	  if (isBuffer$2(buf)) {
+    	    this.set({
+    	      buf: buf
+    	    });
+    	  } else if (_.isString(buf)) {
+    	    var b = Buffer$1.from(buf, 'hex');
+    	    if (b.length * 2 !== buf.length) { throw new TypeError('Invalid hex string') }
+
+    	    this.set({
+    	      buf: b
+    	    });
+    	  } else if (_.isObject(buf)) {
+    	    var obj = buf;
+    	    this.set(obj);
+    	  } else {
+    	    throw new TypeError('Unrecognized argument for BufferReader')
+    	  }
+    	};
+
+    	BufferReader.prototype.set = function (obj) {
+    	  this.buf = obj.buf || this.buf || undefined;
+    	  this.pos = obj.pos || this.pos || 0;
+    	  return this
+    	};
+
+    	BufferReader.prototype.eof = function () {
+    	  return this.pos >= this.buf.length
+    	};
+
+    	BufferReader.prototype.finished = BufferReader.prototype.eof;
+
+    	BufferReader.prototype.read = function (len) {
+    	  $.checkArgument(!_.isUndefined(len), 'Must specify a length');
+    	  var buf = this.buf.slice(this.pos, this.pos + len);
+    	  this.pos = this.pos + len;
+    	  return buf
+    	};
+
+    	BufferReader.prototype.readAll = function () {
+    	  var buf = this.buf.slice(this.pos, this.buf.length);
+    	  this.pos = this.buf.length;
+    	  return buf
+    	};
+
+    	BufferReader.prototype.readUInt8 = function () {
+    	  var val = this.buf.readUInt8(this.pos);
+    	  this.pos = this.pos + 1;
+    	  return val
+    	};
+
+    	BufferReader.prototype.readUInt16BE = function () {
+    	  var val = this.buf.readUInt16BE(this.pos);
+    	  this.pos = this.pos + 2;
+    	  return val
+    	};
+
+    	BufferReader.prototype.readUInt16LE = function () {
+    	  var val = this.buf.readUInt16LE(this.pos);
+    	  this.pos = this.pos + 2;
+    	  return val
+    	};
+
+    	BufferReader.prototype.readUInt32BE = function () {
+    	  var val = this.buf.readUInt32BE(this.pos);
+    	  this.pos = this.pos + 4;
+    	  return val
+    	};
+
+    	BufferReader.prototype.readUInt32LE = function () {
+    	  var val = this.buf.readUInt32LE(this.pos);
+    	  this.pos = this.pos + 4;
+    	  return val
+    	};
+
+    	BufferReader.prototype.readInt32LE = function () {
+    	  var val = this.buf.readInt32LE(this.pos);
+    	  this.pos = this.pos + 4;
+    	  return val
+    	};
+
+    	BufferReader.prototype.readUInt64BEBN = function () {
+    	  var buf = this.buf.slice(this.pos, this.pos + 8);
+    	  var bn = BN.fromBuffer(buf);
+    	  this.pos = this.pos + 8;
+    	  return bn
+    	};
+
+    	BufferReader.prototype.readUInt64LEBN = function () {
+    	  var second = this.buf.readUInt32LE(this.pos);
+    	  var first = this.buf.readUInt32LE(this.pos + 4);
+    	  var combined = (first * 0x100000000) + second;
+    	  // Instantiating an instance of BN with a number is faster than with an
+    	  // array or string. However, the maximum safe number for a double precision
+    	  // floating point is 2 ^ 52 - 1 (0x1fffffffffffff), thus we can safely use
+    	  // non-floating point numbers less than this amount (52 bits). And in the case
+    	  // that the number is larger, we can instatiate an instance of BN by passing
+    	  // an array from the buffer (slower) and specifying the endianness.
+    	  var bn;
+    	  if (combined <= 0x1fffffffffffff) {
+    	    bn = new BN(combined);
+    	  } else {
+    	    var data = Array.prototype.slice.call(this.buf, this.pos, this.pos + 8);
+    	    bn = new BN(data, 10, 'le');
+    	  }
+    	  this.pos = this.pos + 8;
+    	  return bn
+    	};
+
+    	BufferReader.prototype.readVarintNum = function () {
+    	  var first = this.readUInt8();
+    	  switch (first) {
+    	    case 0xFD:
+    	      return this.readUInt16LE()
+    	    case 0xFE:
+    	      return this.readUInt32LE()
+    	    case 0xFF:
+    	      var bn = this.readUInt64LEBN();
+    	      var n = bn.toNumber();
+    	      if (n <= Math.pow(2, 53)) {
+    	        return n
+    	      } else {
+    	        throw new Error('number too large to retain precision - use readVarintBN')
+    	      }
+    	      // break // unreachable
+    	    default:
+    	      return first
+    	  }
+    	};
+
+    	/**
+    	 * reads a length prepended buffer
+    	 */
+    	BufferReader.prototype.readVarLengthBuffer = function () {
+    	  var len = this.readVarintNum();
+    	  var buf = this.read(len);
+    	  $.checkState(buf.length === len, 'Invalid length while reading varlength buffer. ' +
+    	    'Expected to read: ' + len + ' and read ' + buf.length);
+    	  return buf
+    	};
+
+    	BufferReader.prototype.readVarintBuf = function () {
+    	  var first = this.buf.readUInt8(this.pos);
+    	  switch (first) {
+    	    case 0xFD:
+    	      return this.read(1 + 2)
+    	    case 0xFE:
+    	      return this.read(1 + 4)
+    	    case 0xFF:
+    	      return this.read(1 + 8)
+    	    default:
+    	      return this.read(1)
+    	  }
+    	};
+
+    	BufferReader.prototype.readVarintBN = function () {
+    	  var first = this.readUInt8();
+    	  switch (first) {
+    	    case 0xFD:
+    	      return new BN(this.readUInt16LE())
+    	    case 0xFE:
+    	      return new BN(this.readUInt32LE())
+    	    case 0xFF:
+    	      return this.readUInt64LEBN()
+    	    default:
+    	      return new BN(first)
+    	  }
+    	};
+
+    	BufferReader.prototype.reverse = function () {
+    	  var buf = Buffer$1.alloc(this.buf.length);
+    	  for (var i = 0; i < buf.length; i++) {
+    	    buf[i] = this.buf[this.buf.length - 1 - i];
+    	  }
+    	  this.buf = buf;
+    	  return this
+    	};
+
+    	BufferReader.prototype.readReverse = function (len) {
+    	  if (_.isUndefined(len)) {
+    	    len = this.buf.length;
+    	  }
+    	  var buf = this.buf.slice(this.pos, this.pos + len);
+    	  this.pos = this.pos + len;
+    	  return Buffer$1.from(buf).reverse()
+    	};
+
+    	bufferreader = BufferReader;
+    	return bufferreader;
+    }
 
     var varint;
     var hasRequiredVarint;
@@ -66507,12 +66505,14 @@
     	};
 
     	Varint.prototype.fromBN = function (bn) {
-    	  this.buf = BufferWriter().writeVarintBN(bn).concat();
+    	  var bw = new BufferWriter();
+    	  this.buf = bw.writeVarintBN(bn).toBuffer();
     	  return this
     	};
 
     	Varint.prototype.fromNumber = function (num) {
-    	  this.buf = BufferWriter().writeVarintNum(num).concat();
+    	  var bw = new BufferWriter();
+    	  this.buf = bw.writeVarintNum(num).toBuffer();
     	  return this
     	};
 
@@ -66558,7 +66558,7 @@
     	  if (_.isObject(args)) {
     	    this.satoshis = args.satoshis;
     	    if (isBuffer$2(args.script)) {
-    	      this._scriptBuffer = args.script;
+    	      this.setScriptFromBuffer(args.script);
     	    } else {
     	      var script;
     	      if (_.isString(args.script) && JSUtil.isHexa(args.script)) {
@@ -66577,12 +66577,7 @@
     	  configurable: false,
     	  enumerable: true,
     	  get: function () {
-    	    if (this._script) {
-    	      return this._script
-    	    } else {
-    	      this.setScriptFromBuffer(this._scriptBuffer);
-    	      return this._script
-    	    }
+    	    return this._script
     	  }
     	});
 
@@ -66647,7 +66642,7 @@
     	  var obj = {
     	    satoshis: this.satoshis
     	  };
-    	  obj.script = this._scriptBuffer.toString('hex');
+    	  obj.script = this._script.toBuffer().toString('hex');
     	  return obj
     	};
 
@@ -66656,9 +66651,8 @@
     	};
 
     	Output.prototype.setScriptFromBuffer = function (buffer) {
-    	  this._scriptBuffer = buffer;
     	  try {
-    	    this._script = Script.fromBuffer(this._scriptBuffer);
+    	    this._script = Script.fromBuffer(buffer);
     	    this._script._isOutput = true;
     	  } catch (e) {
     	    if (e instanceof errors.Script.InvalidBuffer) {
@@ -66671,12 +66665,10 @@
 
     	Output.prototype.setScript = function (script) {
     	  if (script instanceof Script) {
-    	    this._scriptBuffer = script.toBuffer();
     	    this._script = script;
     	    this._script._isOutput = true;
     	  } else if (_.isString(script)) {
     	    this._script = Script.fromString(script);
-    	    this._scriptBuffer = this._script.toBuffer();
     	    this._script._isOutput = true;
     	  } else if (isBuffer$2(script)) {
     	    this.setScriptFromBuffer(script);
@@ -66690,8 +66682,6 @@
     	  var scriptStr;
     	  if (this.script) {
     	    scriptStr = this.script.inspect();
-    	  } else {
-    	    scriptStr = this._scriptBuffer.toString('hex');
     	  }
     	  return '<Output (' + this.satoshis + ' sats) ' + scriptStr + '>'
     	};
@@ -66713,7 +66703,7 @@
     	    writer = new BufferWriter();
     	  }
     	  writer.writeUInt64LEBN(this._satoshisBN);
-    	  var script = this._scriptBuffer;
+    	  var script = this._script.toBuffer();
     	  writer.writeVarintNum(script.length);
     	  writer.write(script);
     	  return writer
@@ -66756,7 +66746,7 @@
     	var DEFAULT_SEQNUMBER = MAXINT;
     	var DEFAULT_LOCKTIME_SEQNUMBER = MAXINT - 1;
 
-    	function Input(params) {
+    	function Input (params) {
     	  if (!(this instanceof Input)) {
     	    return new Input(params)
     	  }
@@ -66813,7 +66803,7 @@
     	  return this
     	};
 
-    	Input.prototype.toObject = Input.prototype.toJSON = function toObject() {
+    	Input.prototype.toObject = Input.prototype.toJSON = function toObject () {
     	  var obj = {
     	    prevTxId: this.prevTxId.toString('hex'),
     	    outputIndex: this.outputIndex,
@@ -67841,9 +67831,8 @@
     	  }
 
     	  var writer = new BufferWriter();
-
     	  // Version
-    	  writer.writeInt32LE(transaction.version);
+    	  writer.writeUInt32LE(transaction.version);
 
     	  // Input prevouts/nSequence (none/all, depending on flags)
     	  writer.write(hashPrevouts);
@@ -67854,8 +67843,9 @@
     	  writer.writeUInt32LE(input.outputIndex);
 
     	  // scriptCode of the input (serialized as scripts inside CTxOuts)
-    	  writer.writeVarintNum(subscript.toBuffer().length);
-    	  writer.write(subscript.toBuffer());
+    	  var subscriptBuffer = subscript.toBuffer();
+    	  writer.writeVarintNum(subscriptBuffer.length);
+    	  writer.write(subscriptBuffer);
 
     	  // value of the output spent by this input (8-byte little endian)
     	  writer.writeUInt64LEBN(satoshisBN);
@@ -67872,7 +67862,6 @@
 
     	  // sighashType
     	  writer.writeUInt32LE(sighashType >>> 0);
-
     	  var buf = writer.toBuffer();
     	  return buf
     	};
@@ -67897,12 +67886,6 @@
     	    flags = DEFAULT_SIGN_FLAGS;
     	  }
 
-    	  // Copy transaction
-    	  var txcopy = Transaction.shallowCopy(transaction);
-
-    	  // Copy script
-    	  subscript = new Script(subscript);
-
     	  if (flags & Interpreter.SCRIPT_ENABLE_REPLAY_PROTECTION) {
     	    // Legacy chain's value for fork id must be of the form 0xffxxxx.
     	    // By xoring with 0xdead, we ensure that the value will be different
@@ -67913,8 +67896,14 @@
     	  }
 
     	  if ((sighashType & Signature.SIGHASH_FORKID) && (flags & Interpreter.SCRIPT_ENABLE_SIGHASH_FORKID)) {
-    	    return sighashPreimageForForkId(txcopy, sighashType, inputNumber, subscript, satoshisBN)
+    	    return sighashPreimageForForkId(transaction, sighashType, inputNumber, subscript, satoshisBN)
     	  }
+
+    	  // Copy transaction
+    	  var txcopy = Transaction.shallowCopy(transaction);
+
+    	  // Copy script
+    	  subscript = new Script(subscript);
 
     	  // For no ForkId sighash, separators need to be removed.
     	  subscript.removeCodeseparators();
@@ -68068,7 +68057,7 @@
     	 * @param {string|Script} data.scriptPubKey the script that must be resolved to release the funds
     	 * @param {string|Script=} data.script alias for `scriptPubKey`
     	 * @param {number} data.amount amount of bitcoins associated
-    	 * @param {number=} data.satoshis alias for `amount`, but expressed in satoshis (1 space = 1e8 satoshis)
+    	 * @param {number=} data.satoshis alias for `amount`, but expressed in satoshis (1 BSV = 1e8 satoshis)
     	 * @param {string|Address=} data.address the associated address to the script, if provided
     	 */
     	function UnspentOutput (data) {
@@ -68184,7 +68173,7 @@
     	 * @param {*} serialized
     	 * @constructor
     	 */
-    	function Transaction (serialized) {
+    	function Transaction(serialized) {
     	  if (!(this instanceof Transaction)) {
     	    return new Transaction(serialized)
     	  }
@@ -68259,7 +68248,7 @@
     	  get: function () {
     	    this._hash = new BufferReader(this._getHash()).readReverse().toString('hex');
     	    return this._hash
-    	  }
+    	  },
     	};
     	Object.defineProperty(Transaction.prototype, 'hash', hashProperty);
     	Object.defineProperty(Transaction.prototype, 'id', hashProperty);
@@ -68269,7 +68258,7 @@
     	  enumerable: true,
     	  get: function () {
     	    return this._getInputAmount()
-    	  }
+    	  },
     	};
     	Object.defineProperty(Transaction.prototype, 'inputAmount', ioProperty);
     	ioProperty.get = function () {
@@ -68283,7 +68272,7 @@
     	 */
     	Transaction.prototype._getHash = function () {
     	  if (this.version >= 10) {
-    	      return Hash.sha256sha256(this.newTxHeader().toBuffer())
+    	    return Hash.sha256sha256(this.newTxHeader().toBuffer())
     	  }
     	  return Hash.sha256sha256(this.toBuffer())
     	};
@@ -68323,8 +68312,8 @@
     	Transaction.prototype.checkedSerialize = function (opts) {
     	  var serializationError = this.getSerializationError(opts);
     	  if (serializationError) {
-    	    serializationError.message += ' - For more information please see: ' +
-    	      'https://bsv.io/api/lib/transaction#serialization-checks';
+    	    serializationError.message +=
+    	      ' - For more information please see: ' + 'https://bsv.io/api/lib/transaction#serialization-checks';
     	    throw serializationError
     	  }
     	  return this.uncheckedSerialize()
@@ -68364,15 +68353,13 @@
     	    unspentError = this._hasFeeError(opts, unspent);
     	  }
 
-    	  return unspentError ||
-    	    this._hasDustOutputs(opts) ||
-    	    this._isMissingSignatures(opts)
+    	  return unspentError || this._hasDustOutputs(opts) || this._isMissingSignatures(opts)
     	};
 
     	Transaction.prototype._hasFeeError = function (opts, unspent) {
     	  if (!_.isUndefined(this._fee) && this._fee !== unspent) {
     	    return new errors.Transaction.FeeError.Different(
-    	      'Unspent value is ' + unspent + ' but specified fee is ' + this._fee
+    	      'Unspent value is ' + unspent + ' but specified fee is ' + this._fee,
     	    )
     	  }
 
@@ -68380,13 +68367,9 @@
     	    var maximumFee = Math.floor(Transaction.FEE_SECURITY_MARGIN * this._estimateFee());
     	    if (unspent > maximumFee) {
     	      if (this._missingChange()) {
-    	        return new errors.Transaction.ChangeAddressMissing(
-    	          'Fee is too large and no change address was provided'
-    	        )
+    	        return new errors.Transaction.ChangeAddressMissing('Fee is too large and no change address was provided')
     	      }
-    	      return new errors.Transaction.FeeError.TooLarge(
-    	        'expected less than ' + maximumFee + ' but got ' + unspent
-    	      )
+    	      return new errors.Transaction.FeeError.TooLarge('expected less than ' + maximumFee + ' but got ' + unspent)
     	    }
     	  }
     	};
@@ -68491,7 +68474,7 @@
     	  return this
     	};
 
-    	Transaction.prototype.toObject = Transaction.prototype.toJSON = function toObject () {
+    	Transaction.prototype.toObject = Transaction.prototype.toJSON = function toObject() {
     	  var inputs = [];
     	  this.inputs.forEach(function (input) {
     	    inputs.push(input.toObject());
@@ -68505,7 +68488,7 @@
     	    version: this.version,
     	    inputs: inputs,
     	    outputs: outputs,
-    	    nLockTime: this.nLockTime
+    	    nLockTime: this.nLockTime,
     	  };
     	  if (this._changeScript) {
     	    obj.changeScript = this._changeScript.toString();
@@ -68519,7 +68502,7 @@
     	  return obj
     	};
 
-    	Transaction.prototype.fromObject = function fromObject (arg) {
+    	Transaction.prototype.fromObject = function fromObject(arg) {
     	  $.checkArgument(_.isObject(arg) || arg instanceof Transaction);
     	  var self = this;
     	  var transaction;
@@ -68538,9 +68521,7 @@
     	    if (script.isPublicKeyHashOut()) {
     	      txin = new Input.PublicKeyHash(input);
     	    } else if (script.isScriptHashOut() && input.publicKeys && input.threshold) {
-    	      txin = new Input.MultiSigScriptHash(
-    	        input, input.publicKeys, input.threshold, input.signatures
-    	      );
+    	      txin = new Input.MultiSigScriptHash(input, input.publicKeys, input.threshold, input.signatures);
     	    } else if (script.isPublicKeyOut()) {
     	      txin = new Input.PublicKey(input);
     	    } else {
@@ -68570,8 +68551,10 @@
     	  if (!_.isUndefined(this._changeIndex)) {
     	    $.checkState(this._changeScript, 'Change script is expected.');
     	    $.checkState(this.outputs[this._changeIndex], 'Change index points to undefined output.');
-    	    $.checkState(this.outputs[this._changeIndex].script.toString() ===
-    	      this._changeScript.toString(), 'Change output has an unexpected script.');
+    	    $.checkState(
+    	      this.outputs[this._changeIndex].script.toString() === this._changeScript.toString(),
+    	      'Change output has an unexpected script.',
+    	    );
     	  }
     	  if (arg && arg.hash) {
     	    $.checkState(arg.hash === this.hash, 'Hash in object does not match transaction hash.');
@@ -68740,20 +68723,24 @@
     	  } else {
     	    Clazz = Input;
     	  }
-    	  this.addInput(new Clazz({
-    	    output: new Output({
-    	      script: utxo.script,
-    	      satoshis: utxo.satoshis
+    	  this.addInput(
+    	    new Clazz({
+    	      output: new Output({
+    	        script: utxo.script,
+    	        satoshis: utxo.satoshis,
+    	      }),
+    	      prevTxId: utxo.txId,
+    	      outputIndex: utxo.outputIndex,
+    	      script: Script.empty(),
     	    }),
-    	    prevTxId: utxo.txId,
-    	    outputIndex: utxo.outputIndex,
-    	    script: Script.empty()
-    	  }));
+    	  );
     	};
 
     	Transaction.prototype._fromMultisigUtxo = function (utxo, pubkeys, threshold) {
-    	  $.checkArgument(threshold <= pubkeys.length,
-    	    'Number of required signatures must be greater than the number of public keys');
+    	  $.checkArgument(
+    	    threshold <= pubkeys.length,
+    	    'Number of required signatures must be greater than the number of public keys',
+    	  );
     	  var Clazz;
     	  utxo = new UnspentOutput(utxo);
     	  if (utxo.script.isMultisigOut()) {
@@ -68763,15 +68750,21 @@
     	  } else {
     	    throw new Error('@TODO')
     	  }
-    	  this.addInput(new Clazz({
-    	    output: new Output({
-    	      script: utxo.script,
-    	      satoshis: utxo.satoshis
-    	    }),
-    	    prevTxId: utxo.txId,
-    	    outputIndex: utxo.outputIndex,
-    	    script: Script.empty()
-    	  }, pubkeys, threshold));
+    	  this.addInput(
+    	    new Clazz(
+    	      {
+    	        output: new Output({
+    	          script: utxo.script,
+    	          satoshis: utxo.satoshis,
+    	        }),
+    	        prevTxId: utxo.txId,
+    	        outputIndex: utxo.outputIndex,
+    	        script: Script.empty(),
+    	      },
+    	      pubkeys,
+    	      threshold,
+    	    ),
+    	  );
     	};
 
     	/**
@@ -68794,7 +68787,7 @@
     	    $.checkArgumentType(satoshis, 'number', 'satoshis');
     	    input.output = new Output({
     	      script: outputScript,
-    	      satoshis: satoshis
+    	      satoshis: satoshis,
     	    });
     	  }
     	  return this.uncheckedAddInput(input)
@@ -68821,9 +68814,11 @@
     	 * @return {boolean}
     	 */
     	Transaction.prototype.hasAllUtxoInfo = function () {
-    	  return _.every(this.inputs.map(function (input) {
-    	    return !!input.output
-    	  }))
+    	  return _.every(
+    	    this.inputs.map(function (input) {
+    	      return !!input.output
+    	    }),
+    	  )
     	};
 
     	/**
@@ -68909,14 +68904,13 @@
     	    return this
     	  }
 
-    	  $.checkArgument(
-    	    JSUtil.isNaturalNumber(amount),
-    	    'Amount is expected to be a positive integer'
+    	  $.checkArgument(JSUtil.isNaturalNumber(amount), 'Amount is expected to be a positive integer');
+    	  this.addOutput(
+    	    new Output({
+    	      script: Script(new Address(address)),
+    	      satoshis: amount,
+    	    }),
     	  );
-    	  this.addOutput(new Output({
-    	    script: Script(new Address(address)),
-    	    satoshis: amount
-    	  }));
     	  return this
     	};
 
@@ -68931,10 +68925,12 @@
     	 * @return {Transaction} this, for chaining
     	 */
     	Transaction.prototype.addData = function (value) {
-    	  this.addOutput(new Output({
-    	    script: Script.buildDataOut(value),
-    	    satoshis: 0
-    	  }));
+    	  this.addOutput(
+    	    new Output({
+    	      script: Script.buildDataOut(value),
+    	      satoshis: 0,
+    	    }),
+    	  );
     	  return this
     	};
 
@@ -68949,10 +68945,12 @@
     	 * @return {Transaction} this, for chaining
     	 */
     	Transaction.prototype.addSafeData = function (value) {
-    	  this.addOutput(new Output({
-    	    script: Script.buildSafeDataOut(value),
-    	    satoshis: 0
-    	  }));
+    	  this.addOutput(
+    	    new Output({
+    	      script: Script.buildSafeDataOut(value),
+    	      satoshis: 0,
+    	    }),
+    	  );
     	  return this
     	};
 
@@ -69024,11 +69022,9 @@
     	};
 
     	Transaction.prototype._updateChangeOutput = function () {
-
-    	  if(this.isSeal) {
+    	  if (this.isSeal) {
     	    throw new errors.Transaction.TransactionAlreadySealed()
     	  }
-
 
     	  if (!this._changeScript) {
     	    return
@@ -69038,10 +69034,12 @@
     	    this._removeOutput(this._changeIndex);
     	  }
     	  this._changeIndex = this.outputs.length;
-    	  this._addOutput(new Output({
-    	    script: this._changeScript,
-    	    satoshis: 0
-    	  }));
+    	  this._addOutput(
+    	    new Output({
+    	      script: this._changeScript,
+    	      satoshis: 0,
+    	    }),
+    	  );
     	  var available = this._getUnspentValue();
     	  var fee = this.getFee();
     	  var changeAmount = available - fee;
@@ -69049,10 +69047,12 @@
     	  this._changeIndex = undefined;
     	  if (changeAmount >= Transaction.DUST_AMOUNT) {
     	    this._changeIndex = this.outputs.length;
-    	    this._addOutput(new Output({
-    	      script: this._changeScript,
-    	      satoshis: changeAmount
-    	    }));
+    	    this._addOutput(
+    	      new Output({
+    	        script: this._changeScript,
+    	        satoshis: changeAmount,
+    	      }),
+    	    );
     	  }
     	};
     	/**
@@ -69092,7 +69092,7 @@
     	 */
     	Transaction.prototype._estimateFee = function () {
     	  var estimatedSize = this._estimateSize();
-    	  return Math.ceil(estimatedSize / 1000 * (this._feePerKb || Transaction.FEE_PER_KB))
+    	  return Math.ceil((estimatedSize / 1000) * (this._feePerKb || Transaction.FEE_PER_KB))
     	};
 
     	Transaction.prototype._getUnspentValue = function () {
@@ -69150,16 +69150,14 @@
     	  this.sortInputs(function (inputs) {
     	    var copy = Array.prototype.concat.apply([], inputs);
     	    copy.sort(function (first, second) {
-    	      return first.prevTxId.compare(second.prevTxId) ||
-    	        first.outputIndex - second.outputIndex
+    	      return first.prevTxId.compare(second.prevTxId) || first.outputIndex - second.outputIndex
     	    });
     	    return copy
     	  });
     	  this.sortOutputs(function (outputs) {
     	    var copy = Array.prototype.concat.apply([], outputs);
     	    copy.sort(function (first, second) {
-    	      return first.satoshis - second.satoshis ||
-    	        first.script.toBuffer().compare(second.script.toBuffer())
+    	      return first.satoshis - second.satoshis || first.script.toBuffer().compare(second.script.toBuffer())
     	    });
     	    return copy
     	  });
@@ -69205,8 +69203,8 @@
     	};
 
     	Transaction.prototype._newOutputOrder = function (newOutputs) {
-    	  var isInvalidSorting = (this.outputs.length !== newOutputs.length ||
-    	                          _.difference(this.outputs, newOutputs).length !== 0);
+    	  var isInvalidSorting =
+    	    this.outputs.length !== newOutputs.length || _.difference(this.outputs, newOutputs).length !== 0;
     	  if (isInvalidSorting) {
     	    throw new errors.Transaction.InvalidSorting()
     	  }
@@ -69271,11 +69269,11 @@
     	Transaction.prototype.getSignatures = function (privKey, sigtype) {
     	  privKey = new PrivateKey(privKey);
     	  // By default, signs using ALL|FORKID
-    	  sigtype = sigtype || (Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID);
+    	  sigtype = sigtype || Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID;
     	  var transaction = this;
     	  var results = [];
     	  var hashData = Hash.sha256ripemd160(privKey.publicKey.toBuffer());
-    	  _.each(this.inputs, function forEachInput (input, index) {
+    	  _.each(this.inputs, function forEachInput(input, index) {
     	    _.each(input.getSignatures(transaction, privKey, index, sigtype, hashData), function (signature) {
     	      results.push(signature);
     	    });
@@ -69303,13 +69301,15 @@
     	    if (input.isFullySigned === Input.prototype.isFullySigned) {
     	      throw new errors.Transaction.UnableToVerifySignature(
     	        'Unrecognized script kind, or not enough information to execute script.' +
-    	        'This usually happens when creating a transaction from a serialized transaction'
+    	          'This usually happens when creating a transaction from a serialized transaction',
     	      )
     	    }
     	  });
-    	  return _.every(_.map(this.inputs, function (input) {
-    	    return input.isFullySigned()
-    	  }))
+    	  return _.every(
+    	    _.map(this.inputs, function (input) {
+    	      return input.isFullySigned()
+    	    }),
+    	  )
     	};
 
     	Transaction.prototype.isValidSignature = function (signature) {
@@ -69317,7 +69317,7 @@
     	  if (this.inputs[signature.inputIndex].isValidSignature === Input.prototype.isValidSignature) {
     	    throw new errors.Transaction.UnableToVerifySignature(
     	      'Unrecognized script kind, or not enough information to execute script.' +
-    	      'This usually happens when creating a transaction from a serialized transaction'
+    	        'This usually happens when creating a transaction from a serialized transaction',
     	    )
     	  }
     	  return this.inputs[signature.inputIndex].isValidSignature(self, signature)
@@ -69399,88 +69399,81 @@
     	 * Analogous to bitcoind's IsCoinBase function in transaction.h
     	 */
     	Transaction.prototype.isCoinbase = function () {
-    	  return (this.inputs.length === 1 && this.inputs[0].isNull())
+    	  return this.inputs.length === 1 && this.inputs[0].isNull()
     	};
 
     	/**
-    	 * 
-    	 * @param {number} inputIndex 
+    	 *
+    	 * @param {number} inputIndex
     	 * @param {Script|(tx, output) => Script} unlockScriptOrCallback  unlockScript or a callback returns unlockScript
     	 * @returns unlockScript of the special input
     	 */
     	Transaction.prototype.setInputScript = function (inputIndex, unlockScriptOrCallback) {
-
     	  if (unlockScriptOrCallback instanceof Function) {
     	    this.unlockScriptCallbackMap.set(inputIndex, unlockScriptOrCallback);
     	    this.inputs[inputIndex].setScript(unlockScriptOrCallback(this, this.inputs[inputIndex].output));
-
     	  } else {
     	    this.inputs[inputIndex].setScript(unlockScriptOrCallback);
     	  }
-    	  
+
     	  this._updateChangeOutput();
-    	  return this;
+    	  return this
     	};
 
     	Transaction.prototype.setInputSequence = function (inputIndex, sequence) {
     	  this.inputs[inputIndex].sequenceNumber = sequence;
-    	  return this;
+    	  return this
     	};
 
     	/**
-    	 * 
-    	 * @param {number} outputIndex 
+    	 *
+    	 * @param {number} outputIndex
     	 * @param {Output|(tx) => Output} outputOrcb  output or a callback returns output
     	 * @returns output
     	 */
     	Transaction.prototype.setOutput = function (outputIndex, outputOrcb) {
-
     	  if (outputOrcb instanceof Function) {
     	    this.outputCallbackMap.set(outputIndex, outputOrcb);
     	    this.outputs[outputIndex] = outputOrcb(this);
-
     	  } else {
     	    this.outputs[outputIndex] = outputOrcb;
     	  }
-    	  
+
     	  this._updateChangeOutput();
-    	  return this;
+    	  return this
     	};
 
-
     	/**
-    	 * Seal a transaction. After the transaction is sealed, except for the unlock script entered, 
+    	 * Seal a transaction. After the transaction is sealed, except for the unlock script entered,
     	 * other attributes of the transaction cannot be modified
     	 */
     	Transaction.prototype.seal = function () {
-
     	  const self = this;
 
-    	  this.outputCallbackMap.forEach(function(outputCallback, key) {
+    	  this.outputCallbackMap.forEach(function (outputCallback, key) {
     	    self.outputs[key] = outputCallback(self);
     	  });
 
-
-    	  this.unlockScriptCallbackMap.forEach(function(unlockScriptCallback, key) {
+    	  this.unlockScriptCallbackMap.forEach(function (unlockScriptCallback, key) {
     	    self.inputs[key].setScript(unlockScriptCallback(self, self.inputs[key].output));
     	  });
 
-    	  if(this._privateKey) {
+    	  if (this._privateKey) {
     	    this.sign(this._privateKey, this._sigType);
     	  }
 
     	  this.isSeal = true;
 
-    	  return this;
+    	  return this
     	};
 
     	Transaction.prototype.setLockTime = function (nLockTime) {
     	  this.nLockTime = nLockTime;
-    	  return this;
+    	  return this
     	};
 
     	/**
-    	 * 
+    	 *
     	 * @returns satoshis of change output
     	 */
     	Transaction.prototype.getChangeAmount = function () {
@@ -69492,36 +69485,32 @@
     	};
 
     	/**
-    	 * 
+    	 *
     	 * @returns estimate fee by transaction size
     	 */
     	Transaction.prototype.getEstimateFee = function () {
-    	  return this._estimateFee();
+    	  return this._estimateFee()
     	};
 
-
     	/**
-    	 * 
-    	 * @param {number} feePerKb the fee per KB for this transaction 
+    	 *
+    	 * @param {number} feePerKb the fee per KB for this transaction
     	 * @returns true or false
     	 */
     	Transaction.prototype.checkFeeRate = function (feePerKb) {
-
     	  const fee = this._getUnspentValue();
 
     	  var estimatedSize = this._estimateSize();
-    	  var expectedFee = Math.ceil(estimatedSize / 1000 * (feePerKb || this._feePerKb || Transaction.FEE_PER_KB));
+    	  var expectedFee = Math.ceil((estimatedSize / 1000) * (feePerKb || this._feePerKb || Transaction.FEE_PER_KB));
 
     	  return fee >= expectedFee
     	};
 
-
     	/**
-    	 * 
+    	 *
     	 * @returns the serialization of all input outpoints
     	 */
     	Transaction.prototype.prevouts = function () {
-
     	  var writer = new BufferWriter();
 
     	  _.each(this.inputs, function (input) {
@@ -69530,9 +69519,8 @@
     	  });
 
     	  var buf = writer.toBuffer();
-    	  return buf.toString('hex');
+    	  return buf.toString('hex')
     	};
-
 
     	transaction = Transaction;
     	return transaction;
@@ -69568,7 +69556,6 @@
     	var Hash = requireHash();
     	var Signature = requireSignature$1();
     	var PublicKey = requirePublickey();
-    	var cloneDeep = requireCloneDeep();
     	var Stack = requireStack();
     	/**
     	 * Bitcoin transactions contain scripts. Each input has a script called the
@@ -69761,6 +69748,7 @@
     	  // if OP_RETURN is found in executed branches after genesis is activated,
     	  // we still have to check if the rest of the script is valid
     	  this.nonTopLevelReturnAfterGenesis = false;
+    	  this.returned = false;
     	};
 
     	Interpreter.prototype.set = function (obj) {
@@ -69781,15 +69769,11 @@
 
     	Interpreter.prototype.subscript = function () {
     	  if (this.sighashScript) {
-    	    return new Script().set({
-    	      chunks: this.sighashScript.chunks
-    	    })
+    	    return this.sighashScript.clone()
     	  } else {
     	    // Subset of script starting at the most recent codeseparator
     	    // CScript scriptCode(pbegincodehash, pend);
-    	    return new Script().set({
-    	      chunks: this.script.chunks.slice(this.pbegincodehash)
-    	    })
+    	    return Script.fromChunks(this.script.chunks.slice(this.pbegincodehash))
     	  }
     	};
 
@@ -70077,7 +70061,7 @@
     	  }
 
     	  try {
-    	    while (this.pc < this.script.chunks.length) {
+    	    while (!this.returned && this.pc < this.script.chunks.length) {
     	      // fExec: if the opcode will be executed, i.e., not in a false branch
     	      let thisStep = { pc: this.pc, fExec: (this.vfExec.indexOf(false) === -1), opcode: Opcode.fromNumber(this.script.chunks[this.pc].opcodenum) };
 
@@ -70111,7 +70095,7 @@
     	Interpreter.prototype._callbackStep = function (thisStep) {
     	  if (typeof this.stepListener === 'function') {
     	    try {
-    	      this.stepListener(thisStep, cloneDeep(this.stack.rawstack, true), cloneDeep(this.altstack.rawstack, true), cloneDeep(this.stack.varStack, true));
+    	      this.stepListener(thisStep);
     	    } catch (err) {
     	      console.log(`Error in Step callback:${err}`);
     	    }
@@ -70555,7 +70539,7 @@
     	          if (this.vfExec.length === 0) {
     	            // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
     	            // presence of unbalanced IFs, invalid opcodes etc)
-    	            this.pc = this.script.chunks.length;
+    	            this.returned = true;
     	            return true
     	          }
     	          // op_return encountered inside if statement after genesis --> check for invalid grammar
@@ -72844,7 +72828,7 @@
     	var _ = require_();
     	var $ = requirePreconditions();
 
-    	var ECDSA = function ECDSA(obj) {
+    	var ECDSA = function ECDSA (obj) {
     	  if (!(this instanceof ECDSA)) {
     	    return new ECDSA(obj)
     	  }
@@ -73364,7 +73348,10 @@
     	  return target
     	};
 
-
+    	/**
+    	 * @link https://en.bitcoin.it/wiki/Difficulty
+    	 * @return {Number}
+    	 */
     	BlockHeader.prototype.getDifficulty = function getDifficulty () {
     	  var difficulty1TargetBN = this.getTargetDifficulty(GENESIS_BITS).mul(new BN(Math.pow(10, 8)));
     	  var currentTargetBN = this.getTargetDifficulty();
@@ -73641,6 +73628,12 @@
     	  return hashes
     	};
 
+    	/**
+    	 * Will build a merkle tree of all the transactions, ultimately arriving at
+    	 * a single point, the merkle root.
+    	 * @link https://en.bitcoin.it/wiki/Protocol_specification#Merkle_Trees
+    	 * @returns {Array} - An array with each level of the tree after the other.
+    	 */
     	Block.prototype.getMerkleTree = function getMerkleTree () {
     	  var tree = this.getTransactionHashes();
 
@@ -73916,7 +73909,20 @@
     	  return txs
     	};
 
-
+    	/**
+    	 * Traverse a the tree in this MerkleBlock, validating it along the way
+    	 * Modeled after Bitcoin Core merkleblock.cpp TraverseAndExtract()
+    	 * @param {Number} - depth - Current height
+    	 * @param {Number} - pos - Current position in the tree
+    	 * @param {Object} - opts - Object with values that need to be mutated throughout the traversal
+    	 * @param {Boolean} - checkForTxs - if true return opts.txs else return the Merkle Hash
+    	 * @param {Number} - opts.flagBitsUsed - Number of flag bits used, should start at 0
+    	 * @param {Number} - opts.hashesUsed - Number of hashes used, should start at 0
+    	 * @param {Array} - opts.txs - Will finish populated by transactions found during traversal that match the filter
+    	 * @returns {Buffer|null} - Buffer containing the Merkle Hash for that height
+    	 * @returns {Array} - transactions found during traversal that match the filter
+    	 * @private
+    	 */
     	MerkleBlock.prototype._traverseMerkleTree = function traverseMerkleTree (depth, pos, opts, checkForTxs) {
     	  opts = opts || {};
     	  opts.txs = opts.txs || [];
@@ -73951,7 +73957,12 @@
     	  }
     	};
 
-
+    	/** Calculates the width of a merkle tree at a given height.
+    	 *  Modeled after Bitcoin Core merkleblock.h CalcTreeWidth()
+    	 * @param {Number} - Height at which we want the tree width
+    	 * @returns {Number} - Width of the tree at a given height
+    	 * @private
+    	 */
     	MerkleBlock.prototype._calcTreeWidth = function calcTreeWidth (height) {
     	  return (this.numTransactions + (1 << height) - 1) >> height
     	};
@@ -74057,9 +74068,9 @@
     	var Point = requirePoint();
     	var PublicKey = requirePublickey();
 
-    	var mvcErrors = requireErrors();
-    	var errors = mvcErrors;
-    	var hdErrors = mvcErrors.HDPublicKey;
+    	var bsvErrors = requireErrors();
+    	var errors = bsvErrors;
+    	var hdErrors = bsvErrors.HDPublicKey;
     	var assert = require$$4;
 
     	var JSUtil = requireJs();
@@ -94668,13 +94679,13 @@
     	                }
     	            }));
     	        }
-    	        getProtocols(protocolsTxId, protocolType, option) {
+    	        getProtocols(params) {
     	            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-    	                const res = yield serviceapi(this.getShowMoneyBaseUrl(option))
+    	                const res = yield serviceapi(this.getShowMoneyBaseUrl(params.option))
     	                    .post("/api/v1/protocol/getProtocolDataList", {
     	                    data: JSON.stringify({
-    	                        protocolTxId: protocolsTxId,
-    	                        nodeName: protocolType,
+    	                        protocolTxId: params.protocolsTxId,
+    	                        nodeName: params.protocolType,
     	                    }),
     	                })
     	                    .catch((error) => {
@@ -114040,6 +114051,7 @@
         bfrcNodeList = []; // 存储Brfc节点， 防止未广播时重复构建
         metaFileSha256TxIdList = []; // 存储metaFileSha256TxId， 防止未广播时重复构建
         network = Network.testnet;
+        metaidWallet = null;
         MetaIdTag = MetaidTag.test;
         addressSessionKey = "AddressPath";
         addressPaths = isBrowserEnv
@@ -114099,6 +114111,10 @@
         userBrfcNodeList = [];
         constructor(params) {
             // this.xpubkey = params.xpubkey;
+            // if (!this.mnemonic) {
+            //   throw new Error(`mnemonic is required`);
+            // }
+            this.metaidWallet = params.metaidWallet;
             this.network = params.network;
             this.metasvApi = params.providerApi.base.metaSvBaseUrl;
             // this.rootAddress = params.rootAddress;
@@ -114231,9 +114247,13 @@
                             debugger;
                             if (option.isBroadcast) {
                                 // 广播 打钱操作
+                                console.log("打钱");
+                                debugger;
                                 if (payToRes && payToRes.transaction) {
                                     await this.metaidProvider.tx.broadcast(payToRes.transaction.toString());
                                 }
+                                console.log("广播剩余交易");
+                                debugger;
                                 // 广播 transactions 所有交易
                                 await this.broadcastNodeTransactions(transactions);
                             }
@@ -114249,6 +114269,7 @@
                         if (option?.isBroadcast) {
                             // 广播 transactions 所有交易
                             console.log("transactions", transactions);
+                            debugger;
                             await this.broadcastNodeTransactions(transactions);
                         }
                         resolve({
@@ -114344,7 +114365,7 @@
                     });
                     if (res) {
                         if (option.isBroadcast) {
-                            console.log("res", res);
+                            console.log("创建BRFC节点", res);
                             debugger;
                             const response = await this.metaidProvider.tx.broadcast(res.transaction.toString());
                             if (response?.txid) {
@@ -114410,6 +114431,7 @@
                         //  处理当前节点
                         if (params.nodeName !== NodeName.MetaFile) {
                             // 当前节点的brfc 节点
+                            debugger;
                             if (params.publickey && params.txId) {
                                 // 修改
                                 const res = await this.metaidProvider.tx.getTx(params.txId);
@@ -114425,6 +114447,7 @@
                             }
                             else {
                                 // 新增
+                                debugger;
                                 transactions.currentNodeBrfc = await this.getBrfcNode({
                                     nodeName: params.nodeName,
                                     parentTxId: this.metaidInfo.protocolTxId,
@@ -114575,9 +114598,11 @@
                         tx.from(utxos);
                     }
                     tx.fee(Math.ceil(tx._estimateSize() * useFeeb));
-                    const privateKeys = this.getUtxosPrivateKeys(utxos);
+                    //const privateKeys = this.getUtxosPrivateKeys(utxos);
                     // @ts-ignore
-                    tx.sign(privateKeys);
+                    //tx.sign(privateKeys);
+                    console.log("tx", tx);
+                    debugger;
                     resolve(tx);
                 }
                 catch (error) {
@@ -114733,14 +114758,29 @@
                 }
             });
         }
+        txSignatrue(signatureInfo) {
+            const pureSig = mvc.crypto.Signature.fromTxFormat(Buffer.from(signatureInfo.sig), "hex");
+            const txSignature = mvc.Transaction.Signature.fromObject({
+                publicKey: signatureInfo.publicKey,
+                prevTxId: tx.inputs[0].prevTxId,
+                outputIndex: tx.inputs[0].outputIndex,
+                inputIndex: 0,
+                signature: pureSig,
+                sigtype: signatureInfo.sigtype,
+            });
+            const signedScript = mvc.Script.buildPublicKeyHashIn(txSignature.publicKey, txSignature.signature.toDER(), txSignature.sigtype);
+            tx.inputs[0].setScript(signedScript);
+        }
         getBrfcNode(params, option) {
             return new Promise(async (resolve, reject) => {
                 try {
+                    debugger;
                     if (this.bfrcNodeList.some((item) => item.nodeName === params.nodeName)) {
                         resolve(this.bfrcNodeList.find((item) => item.nodeName === params.nodeName)
                             .data);
                     }
                     else {
+                        debugger;
                         const currentNodeBrfc = await this.createBrfcNode(params, option);
                         this.bfrcNodeList.push({
                             nodeName: params.nodeName,
@@ -114807,6 +114847,7 @@
                         });
                         if (protocolRoot) {
                             if (option.isBroadcast) {
+                                console.log("创建协议根节点");
                                 await this.metaidProvider.tx.broadcast(protocolRoot.transaction.toString(), option.chain);
                             }
                             resolve({
@@ -115331,6 +115372,7 @@
                                 });
                                 if (res)
                                     transactions.currentNode = res;
+                                debugger;
                                 this.setTransferUtxoAndOutputAndSign(transactions.currentNode.transaction, [utxo], params.nodeName === NodeName.NftIssue
                                     ? this.rootAddress
                                     : lastChangeAddress);
@@ -115395,9 +115437,11 @@
             tx.change(changeAddress);
             // @ts-ignore
             tx.fee(Math.ceil(tx._estimateSize() * useFeeb));
-            const privateKeys = this.getUtxosPrivateKeys(utxos);
+            //const privateKeys = this.getUtxosPrivateKeys(utxos);
             // @ts-ignore
-            tx.sign(privateKeys);
+            //tx.sign(privateKeys);
+            console.log("tx", tx);
+            debugger;
         }
         getAttachmentsMark(attachments) {
             let result = [];
@@ -115818,9 +115862,19 @@
     }
 
     async function init() {
+        // await sleep();
+        // console.log("widnow", window.metaidwallet);
+        // let metaidwallet = window.metaidwallet;
+        // const account = await metaidwallet.connect();
+        // console.log("account", account);
+        // const xpub = await metaidwallet.getXPublicKey();
+        // console.log("xpub", xpub);
+        // return;
+        //console.log(mvc);
         try {
             const metaidjsSDK = new MetaIDSdk({
                 network: Network.testnet,
+                // metaidWallet: metaidwallet,
                 providerApi: {
                     base: {
                         network: Network.testnet,
@@ -115831,9 +115885,8 @@
             });
             await metaidjsSDK.initWallet();
             await metaidjsSDK.initMetaIdNode();
-            const attachments = [
-                "metafile://c6c5d695d86c8338fe71a63f8f198d045baad7ce79a33046646b0a40ddbd37e6.jpg",
-            ]; //这里是图片上链后的交易TX，如果是本地未上链图片需要调用 handleUploadImage先把图片处理成hex，实际就是把调用的结果赋值给attachments即可
+            //"metafile://c6c5d695d86c8338fe71a63f8f198d045baad7ce79a33046646b0a40ddbd37e6.jpg",
+            const attachments = []; //这里是图片上链后的交易TX，如果是本地未上链图片需要调用 handleUploadImage先把图片处理成hex，实际就是把调用的结果赋值给attachments即可
             const buzz = await metaidjsSDK.build_meta_data({
                 metaData: {
                     nodeName: NodeName.SimpleMicroblog,

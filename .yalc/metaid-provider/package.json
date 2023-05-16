@@ -1,6 +1,6 @@
 {
   "name": "metaid-provider",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "metaid provider sdk",
   "main": "dist/metaid-provider-sdk.min.js",
   "typings": "src/index.ts",
@@ -21,5 +21,5 @@
     "mvc-lib": "^1.0.5",
     "request-sdk": "file:.yalc/request-sdk"
   },
-  "yalcSig": "54dbc23ed7b773e01db076f08e5de372"
+  "yalcSig": "44247c5bb946fcf999ed0fcb59f4c95b"
 }

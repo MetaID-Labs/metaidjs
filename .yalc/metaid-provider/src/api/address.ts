@@ -70,17 +70,19 @@ export default class Address extends BaseApi {
     });
   }
 
-  getProtocols(
-    protocolsTxId: string,
-    protocolType: string,
-    option?: ApiBaseParams
-  ) {
+  getProtocols(params: {
+    protocolsTxId: string;
+    protocolType: string;
+    option?: ApiBaseParams;
+  }) {
     return new Promise<Array<any>>(async (resolve, reject) => {
-      const res = await serviceapiRequst(this.getShowMoneyBaseUrl(option))
+      const res = await serviceapiRequst(
+        this.getShowMoneyBaseUrl(params.option)
+      )
         .post("/api/v1/protocol/getProtocolDataList", {
           data: JSON.stringify({
-            protocolTxId: protocolsTxId,
-            nodeName: protocolType,
+            protocolTxId: params.protocolsTxId,
+            nodeName: params.protocolType,
           }),
         })
         .catch((error: any) => {

@@ -1,28 +1,48 @@
-import { Network, NodeName } from "./enum/index";
-import { MetaIDSdk } from "./utils/metaid-sdk";
-import { compressImage, FileToAttachmentItem } from "./utils";
-
+import { Network, NodeName } from "@/enum/index";
+import { MetaIDSdk } from "@/utils/metaid-sdk";
+import { compressImage, FileToAttachmentItem } from "@/utils";
+//@ts-ignore
+//import { mvc } from "meta-contract";
 //这里需要传入要上传的文件对象
-async function handleUploadImage(e: any) {
-  const files: File[] = [...e.target.files];
-  const attachments = [];
-  for (let i = 0; i < files.length; i++) {
-    if (attachments.length < 9) {
-      // 压缩图片
-      const compressed = await compressImage(files[i]);
-      const result = await FileToAttachmentItem(compressed);
-      if (result) attachments.push(result);
-    } else {
-      break;
-    }
-  }
-  return attachments;
-}
+// async function handleUploadImage(e: any) {
+//   const files: File[] = [...e.target.files];
+//   const attachments = [];
+//   for (let i = 0; i < files.length; i++) {
+//     if (attachments.length < 9) {
+//       // 压缩图片
+//       const compressed = await compressImage(files[i]);
+//       const result = await FileToAttachmentItem(compressed);
+//       if (result) attachments.push(result);
+//     } else {
+//       break;
+//     }
+//   }
+//   return attachments;
+// }
+
+// function sleep(time: number = 2000): Promise<void> {
+//   return new Promise((resolve) => {
+//     setTimeout(() => {
+//       resolve();
+//     }, time);
+//   });
+// }
 
 export async function init() {
+  // await sleep();
+  // console.log("widnow", window.metaidwallet);
+  // let metaidwallet = window.metaidwallet;
+  // const account = await metaidwallet.connect();
+  // console.log("account", account);
+  // const xpub = await metaidwallet.getXPublicKey();
+  // console.log("xpub", xpub);
+  // return;
+  //console.log(mvc);
+
   try {
     const metaidjsSDK = new MetaIDSdk({
       network: Network.testnet,
+      // metaidWallet: metaidwallet,
       providerApi: {
         base: {
           network: Network.testnet,
@@ -34,10 +54,8 @@ export async function init() {
 
     await metaidjsSDK.initWallet();
     await metaidjsSDK.initMetaIdNode();
-
-    const attachments = [
-      "metafile://c6c5d695d86c8338fe71a63f8f198d045baad7ce79a33046646b0a40ddbd37e6.jpg",
-    ]; //这里是图片上链后的交易TX，如果是本地未上链图片需要调用 handleUploadImage先把图片处理成hex，实际就是把调用的结果赋值给attachments即可
+    //"metafile://c6c5d695d86c8338fe71a63f8f198d045baad7ce79a33046646b0a40ddbd37e6.jpg",
+    const attachments: any = []; //这里是图片上链后的交易TX，如果是本地未上链图片需要调用 handleUploadImage先把图片处理成hex，实际就是把调用的结果赋值给attachments即可
     const buzz = await metaidjsSDK.build_meta_data({
       metaData: {
         nodeName: NodeName.SimpleMicroblog,
@@ -76,7 +94,9 @@ export async function init() {
       opData: "",
       txId: "",
     });
+
     console.log("buzz", buzz);
+
     // if (!metaIdInfo.metaId) {
     //   throw new Error(`metaid not exist`);
     // }
@@ -85,4 +105,4 @@ export async function init() {
     console.log("error", error);
   }
 }
-init();
+//init();
